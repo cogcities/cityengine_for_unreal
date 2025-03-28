@@ -302,6 +302,7 @@ void AVitruvioBatchActor::ProcessGenerateQueue()
 		{
 			UVitruvioComponent* VitruvioComponent = Item.VitruvioComponents[ComponentIndex];
 			Item.GenerateResultDescription.EvaluatedAttributes[ComponentIndex]->UpdateUnrealAttributeMap(VitruvioComponent->Attributes, VitruvioComponent);
+			VitruvioComponent->bAttributesReady = true;
 			VitruvioComponent->NotifyAttributesChanged();
 		}
 
