@@ -141,7 +141,12 @@ void SetAttribute(UVitruvioComponent* VitruvioComponent, const TMap<FString, URu
 
 	TAttribute->bUserSet = true;
 
-	if (bEvaluateAttributes || bGenerateModel)
+	if (bGenerateModel && VitruvioComponent->IsBatchGenerated())
+	{
+		VitruvioComponent->Generate(CallbackProxy);
+	}
+
+	if (bEvaluateAttributes)
 	{
 		VitruvioComponent->EvaluateRuleAttributes(bGenerateModel, CallbackProxy);
 	}
@@ -240,7 +245,14 @@ void EvaluateAndSetAttributes(UVitruvioComponent* VitruvioComponent, const TMap<
 			}
 		}
 
-		VitruvioComponent->EvaluateRuleAttributes(bGenerateModel, CallbackProxy);
+		if (bGenerateModel && VitruvioComponent->IsBatchGenerated())
+		{
+			VitruvioComponent->Generate(CallbackProxy);
+		}
+		else
+		{
+			VitruvioComponent->EvaluateRuleAttributes(bGenerateModel, CallbackProxy);
+		}
 	}
 }
 
