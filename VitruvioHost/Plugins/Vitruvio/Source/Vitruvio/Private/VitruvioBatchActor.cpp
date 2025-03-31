@@ -261,8 +261,13 @@ void AVitruvioBatchActor::ProcessTiles()
 			Tile->bIsGenerating = true;
 		
 			// clang-format off
-			GenerateResult.Result.Next([this, Tile, InitialShapeVitruvioComponents](const FBatchGenerateResult::ResultType& Result)
+			GenerateResult.Result.Next([WeakThis = MakeWeakObjectPtr(this), Tile, InitialShapeVitruvioComponents](const FBatchGenerateResult::ResultType& Result)
 			{
+				if (!WeakThis.IsValid())
+				{
+					return;
+				}
+				
 				FScopeLock Lock(&Result.Token->Lock);
 
 				if (Result.Token->IsInvalid())
@@ -272,8 +277,8 @@ void AVitruvioBatchActor::ProcessTiles()
 
 				Tile->GenerateToken.Reset();
 
-				FScopeLock GenerateQueueLock(&ProcessQueueCriticalSection);
-				GenerateQueue.Enqueue({Result.Value, Tile, InitialShapeVitruvioComponents});
+				FScopeLock GenerateQueueLock(&WeakThis->ProcessQueueCriticalSection);
+				WeakThis->GenerateQueue.Enqueue({Result.Value, Tile, InitialShapeVitruvioComponents});
 			});
 			// clang-format on
 		}
@@ -297,6 +302,7 @@ void AVitruvioBatchActor::ProcessGenerateQueue()
 		{
 			UVitruvioComponent* VitruvioComponent = Item.VitruvioComponents[ComponentIndex];
 			Item.GenerateResultDescription.EvaluatedAttributes[ComponentIndex]->UpdateUnrealAttributeMap(VitruvioComponent->Attributes, VitruvioComponent);
+			VitruvioComponent->bAttributesReady = true;
 			VitruvioComponent->NotifyAttributesChanged();
 		}
 
