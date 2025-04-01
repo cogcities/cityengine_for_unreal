@@ -203,6 +203,18 @@ public:
 																  bool bGenerateModel = true);
 
 	/**
+	 * Sets the given static mesh as initial shape. Regenerates the model if bGenerateModel is set to true.
+	 *
+	 * @param VitruvioComponent The VitruvioComponent where the initial shape is set.
+	 * @param InitialShapePolygon the new initial shape polygon.
+	 * @param bGenerateModel Whether a model should be generated after the initial shape has set.
+	 * @returns a callback proxy used to register for completion events.
+	 */
+	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = true), Category = "Vitruvio")
+	static UGenerateCompletedCallbackProxy* SetPolygonInitialShape(UVitruvioComponent* VitruvioComponent, const FInitialShapePolygon& InitialShapePolygon,
+																bool bGenerateModel = true);
+
+	/**
 	 * Converts the given Actors to VitruvioActors and optionally assigns the given RulePackage. If an Actor can not be converted (see
 	 * CanConvertToVitruvioActor) it will be ignored.
 	 *

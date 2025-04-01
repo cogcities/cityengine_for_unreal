@@ -21,12 +21,12 @@
 
 class UVitruvioComponent;
 
-USTRUCT()
+USTRUCT(BlueprintType)
 struct VITRUVIO_API FTextureCoordinateSet
 {
 	GENERATED_BODY()
 
-	UPROPERTY()
+	UPROPERTY(BlueprintReadWrite)
 	TArray<FVector2f> TextureCoordinates;
 
 	friend bool operator==(const FTextureCoordinateSet& Lhs, const FTextureCoordinateSet& RHS)
@@ -40,12 +40,12 @@ struct VITRUVIO_API FTextureCoordinateSet
 	}
 };
 
-USTRUCT()
+USTRUCT(BlueprintType)
 struct VITRUVIO_API FInitialShapeHole
 {
 	GENERATED_BODY()
 
-	UPROPERTY()
+	UPROPERTY(BlueprintReadWrite)
 	TArray<int32> Indices;
 
 	friend bool operator==(const FInitialShapeHole& Lhs, const FInitialShapeHole& RHS)
@@ -59,15 +59,15 @@ struct VITRUVIO_API FInitialShapeHole
 	}
 };
 
-USTRUCT()
+USTRUCT(BlueprintType)
 struct VITRUVIO_API FInitialShapeFace
 {
 	GENERATED_BODY()
 
-	UPROPERTY()
+	UPROPERTY(BlueprintReadWrite)
 	TArray<int32> Indices;
 
-	UPROPERTY()
+	UPROPERTY(BlueprintReadWrite)
 	TArray<FInitialShapeHole> Holes;
 
 	friend bool operator==(const FInitialShapeFace& Lhs, const FInitialShapeFace& RHS)
@@ -81,18 +81,18 @@ struct VITRUVIO_API FInitialShapeFace
 	}
 };
 
-USTRUCT()
+USTRUCT(BlueprintType)
 struct VITRUVIO_API FInitialShapePolygon
 {
 	GENERATED_BODY()
 
-	UPROPERTY()
+	UPROPERTY(BlueprintReadWrite)
 	TArray<FInitialShapeFace> Faces;
 
-	UPROPERTY()
+	UPROPERTY(BlueprintReadWrite)
 	TArray<FVector> Vertices;
 
-	UPROPERTY()
+	UPROPERTY(BlueprintReadWrite)
 	TArray<FTextureCoordinateSet> TextureCoordinateSets;
 
 	void FixOrientation();
@@ -209,6 +209,25 @@ public:
 
 	virtual USceneComponent* CreateInitialShapeComponent(UVitruvioComponent* Component) override;
 	USceneComponent* CreateInitialShapeComponent(UVitruvioComponent* Component, const TArray<FSplinePoint>& SplinePoints);
+	virtual void UpdatePolygon(UVitruvioComponent* Component) override;
+	virtual void UpdateSceneComponent(UVitruvioComponent* Component) override;
+	virtual bool CanConstructFrom(AActor* Owner) const override;
+	virtual USceneComponent* CopySceneComponent(AActor* OldActor, AActor* NewActor) const override;
+
+#if WITH_EDITOR
+	virtual bool IsRelevantProperty(UObject* Object, const FPropertyChangedEvent& PropertyChangedEvent) override;
+	virtual bool ShouldConvert(const FInitialShapePolygon& InitialShapePolygon) override;
+#endif
+};
+
+UCLASS()
+class VITRUVIO_API UPolygonInitialShape : public UInitialShape
+{
+public:
+	GENERATED_BODY()
+
+	virtual USceneComponent* CreateInitialShapeComponent(UVitruvioComponent* Component) override;
+	USceneComponent* CreateInitialShapeComponent(UVitruvioComponent* Component, const FInitialShapePolygon& InitialShapePolygon);
 	virtual void UpdatePolygon(UVitruvioComponent* Component) override;
 	virtual void UpdateSceneComponent(UVitruvioComponent* Component) override;
 	virtual bool CanConstructFrom(AActor* Owner) const override;

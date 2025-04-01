@@ -698,3 +698,58 @@ void USplineInitialShape::UpdateSceneComponent(UVitruvioComponent* Component)
 		}
 	}
 }
+
+USceneComponent* UPolygonInitialShape::CreateInitialShapeComponent(UVitruvioComponent* Component)
+{
+	AActor* Owner = Component->GetOwner();
+	if (!Owner)
+	{
+		return nullptr;
+	}
+
+	if (USceneComponent* SceneComponent = Owner->FindComponentByClass<USceneComponent>())
+	{
+		return SceneComponent;
+	}
+	
+	const auto UniqueName = MakeUniqueObjectName(Owner, USceneComponent::StaticClass(), TEXT("InitialShapeComponent"));
+	USceneComponent* SceneComponent = AttachComponent<USceneComponent>(Owner, UniqueName.ToString());
+	return SceneComponent;
+}
+
+USceneComponent* UPolygonInitialShape::CreateInitialShapeComponent(UVitruvioComponent* Component, const FInitialShapePolygon&)
+{
+	return CreateInitialShapeComponent(Component);
+}
+
+void UPolygonInitialShape::UpdatePolygon(UVitruvioComponent* Component)
+{
+}
+
+void UPolygonInitialShape::UpdateSceneComponent(UVitruvioComponent* Component)
+{
+}
+
+bool UPolygonInitialShape::CanConstructFrom(AActor* Owner) const
+{
+	return false;
+}
+
+USceneComponent* UPolygonInitialShape::CopySceneComponent(AActor* OldActor, AActor* NewActor) const
+{
+	USceneComponent* NewSceneComponent = AttachComponent<USceneComponent>(NewActor, TEXT("InitialShapeComponent"), true, RF_Public);
+	return NewSceneComponent;
+}
+#if WITH_EDITOR
+bool UPolygonInitialShape::IsRelevantProperty(UObject* Object, const FPropertyChangedEvent& PropertyChangedEvent)
+{
+	return false;
+}
+
+bool UPolygonInitialShape::ShouldConvert(const FInitialShapePolygon& InitialShapePolygon)
+{
+	return false;
+}
+#endif
+
+

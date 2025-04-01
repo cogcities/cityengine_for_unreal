@@ -367,8 +367,16 @@ public:
 	 * @param bGenerateModel Whether a model should be generated after the attribute has been set.
 	 * @param CallbackProxy The optional callback proxy used for generate completed notifications.
 	 */
-	void SetSplineInitialShape(const TArray<FSplinePoint>& SplinePoints, bool bGenerateModel = true,
-							   UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
+	void SetSplineInitialShape(const TArray<FSplinePoint>& SplinePoints, bool bGenerateModel = true, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
+
+	/**
+	 * Sets the given static mesh as initial shape. Regenerates the model if bGenerateModel is set to true.
+	 *
+	 * @param InitialShapePolygon the new initial shape polygon.
+	 * @param bGenerateModel Whether a model should be generated after the attribute has been set.
+	 * @param CallbackProxy The optional callback proxy used for generate completed notifications.
+	 */
+	void SetPolygonInitialShape(const FInitialShapePolygon& InitialShapePolygon, bool bGenerateModel = true, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
 
 	/** Returns the attributes used for generation. */
 	UFUNCTION(BlueprintCallable, Category = "Vitruvio")

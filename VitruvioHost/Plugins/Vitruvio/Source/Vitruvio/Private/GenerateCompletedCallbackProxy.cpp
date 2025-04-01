@@ -162,9 +162,17 @@ UGenerateCompletedCallbackProxy* UGenerateCompletedCallbackProxy::SetSplineIniti
 	});
 }
 
+UGenerateCompletedCallbackProxy* UGenerateCompletedCallbackProxy::SetPolygonInitialShape(UVitruvioComponent* VitruvioComponent, const FInitialShapePolygon& InitialShapePolygon, bool bGenerateModel)
+{
+	return ExecuteIfComponentValid(TEXT("SetSplineInitialShape"), VitruvioComponent, [InitialShapePolygon, bGenerateModel](UGenerateCompletedCallbackProxy* Proxy, UVitruvioComponent* VitruvioComponent)
+	{
+		VitruvioComponent->SetPolygonInitialShape(InitialShapePolygon, bGenerateModel, Proxy);
+	});
+}
+
 UGenerateCompletedCallbackProxy* UGenerateCompletedCallbackProxy::ConvertToVitruvioActor(UObject* WorldContextObject, const TArray<AActor*>& Actors,
-																						 TArray<AVitruvioActor*>& OutVitruvioActors,
-																						 URulePackage* Rpk, bool bGenerateModels, bool bBatchGeneration)
+                                                                                         TArray<AVitruvioActor*>& OutVitruvioActors,
+                                                                                         URulePackage* Rpk, bool bGenerateModels, bool bBatchGeneration)
 {
 	UGenerateCompletedCallbackProxy* Proxy = NewObject<UGenerateCompletedCallbackProxy>();
 	Proxy->RegisterWithGameInstance(WorldContextObject);

@@ -679,6 +679,17 @@ void UVitruvioComponent::SetSplineInitialShape(const TArray<FSplinePoint>& Splin
 	});
 }
 
+void UVitruvioComponent::SetPolygonInitialShape(const FInitialShapePolygon& InitialShapePolygon, bool bGenerateModel,
+	UGenerateCompletedCallbackProxy* CallbackProxy)
+{
+	SetInitialShape(this, bGenerateModel, CallbackProxy, [this, InitialShapePolygon]() {
+		UPolygonInitialShape* NewInitialShape =
+			NewObject<UPolygonInitialShape>(GetOwner(), UPolygonInitialShape::StaticClass(), NAME_None, RF_Transactional);
+		InitialShapeSceneComponent = NewInitialShape->CreateInitialShapeComponent(this, InitialShapePolygon);
+		return NewInitialShape;
+	});
+}
+
 const TMap<FString, URuleAttribute*>& UVitruvioComponent::GetAttributes() const
 {
 	return Attributes;
