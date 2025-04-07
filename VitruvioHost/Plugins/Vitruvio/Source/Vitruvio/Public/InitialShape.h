@@ -26,7 +26,7 @@ struct VITRUVIO_API FTextureCoordinateSet
 {
 	GENERATED_BODY()
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite, Category = "Vitruvio")
 	TArray<FVector2f> TextureCoordinates;
 
 	friend bool operator==(const FTextureCoordinateSet& Lhs, const FTextureCoordinateSet& RHS)
@@ -45,7 +45,7 @@ struct VITRUVIO_API FInitialShapeHole
 {
 	GENERATED_BODY()
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite, Category = "Vitruvio")
 	TArray<int32> Indices;
 
 	friend bool operator==(const FInitialShapeHole& Lhs, const FInitialShapeHole& RHS)
@@ -64,10 +64,10 @@ struct VITRUVIO_API FInitialShapeFace
 {
 	GENERATED_BODY()
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite, Category = "Vitruvio")
 	TArray<int32> Indices;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite, Category = "Vitruvio")
 	TArray<FInitialShapeHole> Holes;
 
 	friend bool operator==(const FInitialShapeFace& Lhs, const FInitialShapeFace& RHS)
@@ -86,13 +86,13 @@ struct VITRUVIO_API FInitialShapePolygon
 {
 	GENERATED_BODY()
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite, Category = "Vitruvio")
 	TArray<FInitialShapeFace> Faces;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite, Category = "Vitruvio")
 	TArray<FVector> Vertices;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite, Category = "Vitruvio")
 	TArray<FTextureCoordinateSet> TextureCoordinateSets;
 
 	void FixOrientation();
