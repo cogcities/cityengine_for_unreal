@@ -67,6 +67,8 @@ void SetInitialShape(UVitruvioComponent* Component, bool bGenerateModel, UGenera
 
 	Component->InitialShape = NewInitialShape;
 
+	NewInitialShape->UpdatePolygon(Component);
+
 	Component->RemoveGeneratedMeshes();
 	Component->EvaluateRuleAttributes(bGenerateModel, CallbackProxy);
 }

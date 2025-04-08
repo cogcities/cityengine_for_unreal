@@ -707,27 +707,40 @@ USceneComponent* UPolygonInitialShape::CreateInitialShapeComponent(UVitruvioComp
 		return nullptr;
 	}
 
-	if (USceneComponent* SceneComponent = Owner->FindComponentByClass<USceneComponent>())
+	if (UPolygonSceneComponent* SceneComponent = Owner->FindComponentByClass<UPolygonSceneComponent>())
 	{
 		return SceneComponent;
 	}
 	
-	const auto UniqueName = MakeUniqueObjectName(Owner, USceneComponent::StaticClass(), TEXT("InitialShapeComponent"));
-	USceneComponent* SceneComponent = AttachComponent<USceneComponent>(Owner, UniqueName.ToString());
+	const auto UniqueName = MakeUniqueObjectName(Owner, UPolygonSceneComponent::StaticClass(), TEXT("InitialShapeComponent"));
+	UPolygonSceneComponent* SceneComponent = AttachComponent<UPolygonSceneComponent>(Owner, UniqueName.ToString());
 	return SceneComponent;
 }
 
-USceneComponent* UPolygonInitialShape::CreateInitialShapeComponent(UVitruvioComponent* Component, const FInitialShapePolygon&)
+USceneComponent* UPolygonInitialShape::CreateInitialShapeComponent(UVitruvioComponent* Component, const FInitialShapePolygon& NewPolygon)
 {
-	return CreateInitialShapeComponent(Component);
+	UPolygonSceneComponent* PolygonSceneComponent = Cast<UPolygonSceneComponent>(CreateInitialShapeComponent(Component));
+	PolygonSceneComponent->Polygon = NewPolygon;
+	return PolygonSceneComponent;
 }
 
 void UPolygonInitialShape::UpdatePolygon(UVitruvioComponent* Component)
 {
+	UPolygonSceneComponent* PolygonSceneComponent = Cast<UPolygonSceneComponent>(Component->InitialShapeSceneComponent);
+	SetPolygon(PolygonSceneComponent->Polygon);
 }
 
 void UPolygonInitialShape::UpdateSceneComponent(UVitruvioComponent* Component)
 {
+	if (UPolygonSceneComponent* PolygonSceneComponent = Cast<UPolygonSceneComponent>(Component->InitialShapeSceneComponent))
+	{
+		FInitialShapePolygon OldPolygon = PolygonSceneComponent->Polygon;
+
+		if (OldPolygon != GetPolygon())
+		{
+			PolygonSceneComponent->Polygon = GetPolygon();
+		}
+	}
 }
 
 bool UPolygonInitialShape::CanConstructFrom(AActor* Owner) const
@@ -737,9 +750,16 @@ bool UPolygonInitialShape::CanConstructFrom(AActor* Owner) const
 
 USceneComponent* UPolygonInitialShape::CopySceneComponent(AActor* OldActor, AActor* NewActor) const
 {
-	USceneComponent* NewSceneComponent = AttachComponent<USceneComponent>(NewActor, TEXT("InitialShapeComponent"), true, RF_Public);
+	UPolygonSceneComponent* NewSceneComponent = AttachComponent<UPolygonSceneComponent>(NewActor, TEXT("InitialShapeComponent"), true, RF_Public);
+
+	if (const UPolygonSceneComponent* OldSceneComponent = OldActor->FindComponentByClass<UPolygonSceneComponent>())
+	{
+		NewSceneComponent->Polygon = OldSceneComponent->Polygon;
+	}
+	
 	return NewSceneComponent;
 }
+
 #if WITH_EDITOR
 bool UPolygonInitialShape::IsRelevantProperty(UObject* Object, const FPropertyChangedEvent& PropertyChangedEvent)
 {

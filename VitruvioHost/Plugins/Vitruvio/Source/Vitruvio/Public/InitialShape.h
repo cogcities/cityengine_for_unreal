@@ -221,6 +221,15 @@ public:
 };
 
 UCLASS()
+class UPolygonSceneComponent : public USceneComponent
+{
+	GENERATED_BODY()
+
+public:
+	FInitialShapePolygon Polygon;
+};
+
+UCLASS()
 class VITRUVIO_API UPolygonInitialShape : public UInitialShape
 {
 public:
