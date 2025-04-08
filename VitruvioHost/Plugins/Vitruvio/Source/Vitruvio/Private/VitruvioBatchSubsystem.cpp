@@ -33,6 +33,16 @@ void UVitruvioBatchSubsystem::UnregisterVitruvioComponent(UVitruvioComponent* Vi
 	OnComponentDeregistered.Broadcast();
 }
 
+void UVitruvioBatchSubsystem::EvaluateAttributes(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy)
+{
+	GetBatchActor()->EvaluateAttributes(VitruvioComponent, CallbackProxy);
+}
+
+void UVitruvioBatchSubsystem::EvaluateAllAttributes(UGenerateCompletedCallbackProxy* CallbackProxy)
+{
+	GetBatchActor()->EvaluateAllAttributes(CallbackProxy);
+}
+
 void UVitruvioBatchSubsystem::Generate(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy)
 {
 	GetBatchActor()->Generate(VitruvioComponent, CallbackProxy);

@@ -38,14 +38,24 @@ public:
 	bool bMarkedForGenerate;
 	bool bIsGenerating;
 
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Vitruvio")
+	bool bMarkedForEvaluateAttributes;
+	bool bIsEvaluatingAttributes;
+
 	UPROPERTY()
-	TMap<UVitruvioComponent*, UGenerateCompletedCallbackProxy*> CallbackProxies;
+	TMap<UVitruvioComponent*, UGenerateCompletedCallbackProxy*> GenerateCallbackProxies;
+	UPROPERTY()
+	TMap<UVitruvioComponent*, UGenerateCompletedCallbackProxy*> EvaluateAttributesCallbackProxies;
 
 	FBatchGenerateResult::FTokenPtr GenerateToken;
+	FAttributeMapsResult::FTokenPtr EvalAttributesToken;
 
 	UPROPERTY()
 	UGeneratedModelStaticMeshComponent* GeneratedModelComponent;
-    	
+
+	void MarkForAttributeEvaluation(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
+	void UnmarkForAttributeEvaluation();
+	
 	void MarkForGenerate(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
 	void UnmarkForGenerate();
 	
@@ -66,6 +76,9 @@ struct FGrid
 	UPROPERTY()
 	TMap<UVitruvioComponent*, UTile*> TilesByComponent;
 
+	void MarkForAttributeEvaluation(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
+	void MarkAllForAttributeEvaluation();
+
 	void MarkForGenerate(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
 	void MarkAllForGenerate();
 	
@@ -76,12 +89,22 @@ struct FGrid
 	void Clear();
 
 	TArray<UTile*> GetTilesMarkedForGenerate() const;
-	void UnmarkForGenerate();
+	TArray<UTile*> GetTilesMarkedForAttributeEvaluation() const;
+	
+	void UnmarkAllForGenerate();
+	void UnmarkAllForAttributeEvaluation();
 };
 
 struct FBatchGenerateQueueItem
 {
 	FGenerateResultDescription GenerateResultDescription;
+	UTile* Tile;
+	TArray<UVitruvioComponent*> VitruvioComponents;
+};
+
+struct FEvaluateAttributesQueueItem
+{
+	TArray<FAttributeMapPtr> AttributeMaps;
 	UTile* Tile;
 	TArray<UVitruvioComponent*> VitruvioComponents;
 };
@@ -105,6 +128,7 @@ private:
 	FGrid Grid;
 
 	TQueue<FBatchGenerateQueueItem> GenerateQueue;
+	TQueue<FEvaluateAttributesQueueItem> AttributeEvaluationQueue;
 
 	UPROPERTY(Transient)
 	TMap<UMaterialInterface*, FString> MaterialIdentifiers;
@@ -144,6 +168,9 @@ public:
 	void UnregisterAllVitruvioComponents();
 	TSet<UVitruvioComponent*> GetVitruvioComponents();
 
+	void EvaluateAttributes(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
+	void EvaluateAllAttributes(UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
+	
 	void Generate(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
 	void GenerateAll(UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
 	
@@ -172,9 +199,13 @@ public:
 private:
 	void ProcessTiles();
 	void ProcessGenerateQueue();
+	void ProcessAttributeEvaluationQueue();
 
-	FCriticalSection ProcessQueueCriticalSection;
+	FCriticalSection ProcessGenerateQueueCriticalSection;
+	FCriticalSection ProcessAttributeEvaluationQueueCriticalSection;
 
 	UPROPERTY()
 	UGenerateCompletedCallbackProxy* GenerateAllCallbackProxy;
+	UPROPERTY()
+	UGenerateCompletedCallbackProxy* EvaluateAllCallbackProxy;
 };
