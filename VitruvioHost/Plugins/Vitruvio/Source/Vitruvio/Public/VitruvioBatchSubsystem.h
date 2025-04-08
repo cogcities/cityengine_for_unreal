@@ -34,6 +34,10 @@ public:
 	
 	void RegisterVitruvioComponent(UVitruvioComponent* VitruvioComponent);
 	void UnregisterVitruvioComponent(UVitruvioComponent* VitruvioComponent);
+
+	void EvaluateAttributes(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
+	void EvaluateAllAttributes(UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
+	
 	void Generate(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
 	void GenerateAll(UGenerateCompletedCallbackProxy* CallbackProxy);
 
