@@ -24,4 +24,6 @@ void UpdateAttributeMap(TMap<FString, URuleAttribute*>& AttributeMapOut, const A
 						UObject* const Outer);
 
 AttributeMapUPtr CreateAttributeMap(const TMap<FString, URuleAttribute*>& Attributes);
+URuleAttribute* CreateAttribute(const FString& Key, const FString& Value);
+
 } // namespace Vitruvio
