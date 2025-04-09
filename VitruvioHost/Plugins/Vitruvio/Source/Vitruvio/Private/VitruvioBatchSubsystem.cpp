@@ -17,11 +17,11 @@
 
 #include "EngineUtils.h"
 
-void UVitruvioBatchSubsystem::RegisterVitruvioComponent(UVitruvioComponent* VitruvioComponent)
+void UVitruvioBatchSubsystem::RegisterVitruvioComponent(UVitruvioComponent* VitruvioComponent, bool bGenerateModel)
 {
+	GetBatchActor()->RegisterVitruvioComponent(VitruvioComponent, bGenerateModel);
+	
 	RegisteredComponents.Add(VitruvioComponent);
-	GetBatchActor()->RegisterVitruvioComponent(VitruvioComponent);
-
 	OnComponentRegistered.Broadcast();
 }
 
@@ -68,11 +68,11 @@ AVitruvioBatchActor* UVitruvioBatchSubsystem::GetBatchActor()
 			FActorSpawnParameters ActorSpawnParameters;
 			ActorSpawnParameters.Name = FName(TEXT("VitruvioBatchActor"));
 			VitruvioBatchActor = GetWorld()->SpawnActor<AVitruvioBatchActor>(ActorSpawnParameters);
-		}
-
-		for (UVitruvioComponent* VitruvioComponent : RegisteredComponents)
-		{
-			VitruvioBatchActor->RegisterVitruvioComponent(VitruvioComponent);
+			
+			for (UVitruvioComponent* VitruvioComponent : RegisteredComponents)
+			{
+				VitruvioBatchActor->RegisterVitruvioComponent(VitruvioComponent);
+			}
 		}
 	}
 

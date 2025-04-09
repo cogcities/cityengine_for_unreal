@@ -82,8 +82,8 @@ struct FGrid
 	void MarkForGenerate(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
 	void MarkAllForGenerate();
 	
-	void RegisterAll(const TSet<UVitruvioComponent*>& VitruvioComponents, AVitruvioBatchActor* VitruvioBatchActor);
-	void Register(UVitruvioComponent* VitruvioComponent, AVitruvioBatchActor* VitruvioBatchActor);
+	void RegisterAll(const TSet<UVitruvioComponent*>& VitruvioComponents, AVitruvioBatchActor* VitruvioBatchActor, bool bGeneateModel = true);
+	void Register(UVitruvioComponent* VitruvioComponent, AVitruvioBatchActor* VitruvioBatchActor, bool bGeneateModel = true);
 	void Unregister(UVitruvioComponent* VitruvioComponent);
 
 	void Clear();
@@ -163,7 +163,7 @@ public:
 
 	virtual void Tick(float DeltaSeconds) override;
 
-	void RegisterVitruvioComponent(UVitruvioComponent* VitruvioComponent);
+	void RegisterVitruvioComponent(UVitruvioComponent* VitruvioComponent, bool bGenerateModel = true);
 	void UnregisterVitruvioComponent(UVitruvioComponent* VitruvioComponent);
 	void UnregisterAllVitruvioComponents();
 	TSet<UVitruvioComponent*> GetVitruvioComponents();

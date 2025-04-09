@@ -132,15 +132,15 @@ void FGrid::MarkAllForGenerate()
 	}
 }
 
-void FGrid::RegisterAll(const TSet<UVitruvioComponent*>& VitruvioComponents, AVitruvioBatchActor* VitruvioBatchActor)
+void FGrid::RegisterAll(const TSet<UVitruvioComponent*>& VitruvioComponents, AVitruvioBatchActor* VitruvioBatchActor, bool bGeneateModel)
 {
 	for (UVitruvioComponent* VitruvioComponent : VitruvioComponents)
 	{
-		Register(VitruvioComponent, VitruvioBatchActor);
+		Register(VitruvioComponent, VitruvioBatchActor, bGeneateModel);
 	} 
 }
 
-void FGrid::Register(UVitruvioComponent* VitruvioComponent, AVitruvioBatchActor* VitruvioBatchActor)
+void FGrid::Register(UVitruvioComponent* VitruvioComponent, AVitruvioBatchActor* VitruvioBatchActor, bool bGenerateModel)
 {
 	const FIntPoint Position = VitruvioBatchActor->GetPosition(VitruvioComponent);
 	
@@ -159,7 +159,10 @@ void FGrid::Register(UVitruvioComponent* VitruvioComponent, AVitruvioBatchActor*
 	if (!Tile->Contains(VitruvioComponent))
 	{
 		Tile->Add(VitruvioComponent);
-		Tile->MarkForGenerate(VitruvioComponent);
+		if (bGenerateModel)
+		{
+			Tile->MarkForGenerate(VitruvioComponent);
+		}
 		TilesByComponent.Add(VitruvioComponent, Tile);
 	}
 }
@@ -525,10 +528,15 @@ void AVitruvioBatchActor::Tick(float DeltaSeconds)
 	ProcessGenerateQueue();
 }
 
-void AVitruvioBatchActor::RegisterVitruvioComponent(UVitruvioComponent* VitruvioComponent)
+void AVitruvioBatchActor::RegisterVitruvioComponent(UVitruvioComponent* VitruvioComponent, bool bGenerateModel)
 {
+	if (VitruvioComponents.Contains(VitruvioComponent))
+	{
+		return;
+	}
+	
 	VitruvioComponents.Add(VitruvioComponent);
-	Grid.Register(VitruvioComponent, this);
+	Grid.Register(VitruvioComponent, this, bGenerateModel);
 }
 
 void AVitruvioBatchActor::UnregisterVitruvioComponent(UVitruvioComponent* VitruvioComponent)
