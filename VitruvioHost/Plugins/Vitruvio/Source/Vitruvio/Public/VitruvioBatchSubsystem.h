@@ -32,8 +32,12 @@ public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 	
-	void RegisterVitruvioComponent(UVitruvioComponent* VitruvioComponent);
+	void RegisterVitruvioComponent(UVitruvioComponent* VitruvioComponent, bool bGenerateModel = true);
 	void UnregisterVitruvioComponent(UVitruvioComponent* VitruvioComponent);
+
+	void EvaluateAttributes(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
+	void EvaluateAllAttributes(UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
+	
 	void Generate(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
 	void GenerateAll(UGenerateCompletedCallbackProxy* CallbackProxy);
 

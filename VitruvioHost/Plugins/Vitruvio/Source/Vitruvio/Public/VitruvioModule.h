@@ -108,6 +108,7 @@ struct FInitialShape
 using FGenerateResult = TResult<FGenerateResultDescription, FGenerateToken>;
 using FBatchGenerateResult = TResult<FGenerateResultDescription, FGenerateToken>;
 using FAttributeMapResult = TResult<FAttributeMapPtr, FEvalAttributesToken>;
+using FAttributeMapsResult = TResult<TArray<FAttributeMapPtr>, FEvalAttributesToken>;
 
 class VitruvioModule final : public IModuleInterface, public FGCObject
 {
@@ -139,13 +140,26 @@ public:
 	VITRUVIO_API FGenerateResultDescription BatchGenerate(TArray<FInitialShape> InitialShapes) const;
 
 	/**
+	 * \brief Asynchronously Evaluates attributes for the given initial shapes and rule packages.
+	 *
+	 * \param InitialShapes
+	 */
+	VITRUVIO_API FAttributeMapsResult BatchEvaluateRuleAttributesAsync(TArray<FInitialShape> InitialShapes) const;
+	
+	/**
+	 * \brief Evaluates attributes for the given initial shapes and rule package.
+	 *
+	 * \param InitialShapes
+	 */
+	VITRUVIO_API TArray<FAttributeMapPtr> BatchEvaluateRuleAttributes(TArray<FInitialShape> InitialShapes) const;
+
+	/**
 	 * \brief Asynchronously generate the models with the given InitialShape, RulePackage and Attributes.
 	 *
 	 * \param InitialShape
 	 * \return the generated UStaticMesh.
 	 */
 	VITRUVIO_API FGenerateResult GenerateAsync(FInitialShape InitialShape) const;
-
 
 	/**
 	 * \brief Generate the models with the given InitialShape, RulePackage and Attributes.

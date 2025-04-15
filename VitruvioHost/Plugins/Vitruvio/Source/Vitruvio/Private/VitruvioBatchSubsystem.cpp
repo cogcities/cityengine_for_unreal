@@ -17,11 +17,11 @@
 
 #include "EngineUtils.h"
 
-void UVitruvioBatchSubsystem::RegisterVitruvioComponent(UVitruvioComponent* VitruvioComponent)
+void UVitruvioBatchSubsystem::RegisterVitruvioComponent(UVitruvioComponent* VitruvioComponent, bool bGenerateModel)
 {
+	GetBatchActor()->RegisterVitruvioComponent(VitruvioComponent, bGenerateModel);
+	
 	RegisteredComponents.Add(VitruvioComponent);
-	GetBatchActor()->RegisterVitruvioComponent(VitruvioComponent);
-
 	OnComponentRegistered.Broadcast();
 }
 
@@ -31,6 +31,16 @@ void UVitruvioBatchSubsystem::UnregisterVitruvioComponent(UVitruvioComponent* Vi
 	GetBatchActor()->UnregisterVitruvioComponent(VitruvioComponent);
 
 	OnComponentDeregistered.Broadcast();
+}
+
+void UVitruvioBatchSubsystem::EvaluateAttributes(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy)
+{
+	GetBatchActor()->EvaluateAttributes(VitruvioComponent, CallbackProxy);
+}
+
+void UVitruvioBatchSubsystem::EvaluateAllAttributes(UGenerateCompletedCallbackProxy* CallbackProxy)
+{
+	GetBatchActor()->EvaluateAllAttributes(CallbackProxy);
 }
 
 void UVitruvioBatchSubsystem::Generate(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy)
@@ -58,11 +68,11 @@ AVitruvioBatchActor* UVitruvioBatchSubsystem::GetBatchActor()
 			FActorSpawnParameters ActorSpawnParameters;
 			ActorSpawnParameters.Name = FName(TEXT("VitruvioBatchActor"));
 			VitruvioBatchActor = GetWorld()->SpawnActor<AVitruvioBatchActor>(ActorSpawnParameters);
-		}
-
-		for (UVitruvioComponent* VitruvioComponent : RegisteredComponents)
-		{
-			VitruvioBatchActor->RegisterVitruvioComponent(VitruvioComponent);
+			
+			for (UVitruvioComponent* VitruvioComponent : RegisteredComponents)
+			{
+				RegisterVitruvioComponent(VitruvioComponent); 
+			}
 		}
 	}
 

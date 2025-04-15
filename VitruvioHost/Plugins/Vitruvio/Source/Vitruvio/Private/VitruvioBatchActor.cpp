@@ -21,18 +21,39 @@
 #include "GenerateCompletedCallbackProxy.h"
 #include "PhysicsEngine/BodySetup.h"
 
+void UTile::MarkForAttributeEvaluation(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy)
+{
+	bMarkedForEvaluateAttributes = true;
+	if (CallbackProxy)
+	{
+		EvaluateAttributesCallbackProxies.Add(VitruvioComponent, CallbackProxy);
+	}
+}
+
+void UTile::UnmarkForAttributeEvaluation()
+{
+	bMarkedForEvaluateAttributes = false;
+	EvaluateAttributesCallbackProxies.Empty();
+}
+
 void UTile::MarkForGenerate(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy)
 {
+	if (bMarkedForEvaluateAttributes)
+	{
+		UnmarkForAttributeEvaluation();
+	}
+	
 	bMarkedForGenerate = true;
 	if (CallbackProxy)
 	{
-		CallbackProxies.Add(VitruvioComponent, CallbackProxy);
+		GenerateCallbackProxies.Add(VitruvioComponent, CallbackProxy);
 	}
 }
 
 void UTile::UnmarkForGenerate()
 {
 	bMarkedForGenerate = false;
+	GenerateCallbackProxies.Empty();
 }
 
 void UTile::Add(UVitruvioComponent* VitruvioComponent)
@@ -57,7 +78,7 @@ TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> UTile::GetInitialShap
 	
 	for (UVitruvioComponent* VitruvioComponent : VitruvioComponents)
 	{
-		if (!VitruvioComponent->GetRpk())
+		if (!VitruvioComponent->HasValidInputData())
 		{
 			continue;
 		}
@@ -77,6 +98,23 @@ TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> UTile::GetInitialShap
 	return MakeTuple(MoveTemp(InitialShapes), ValidVitruvioComponents);
 }
 
+void FGrid::MarkForAttributeEvaluation(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy)
+{
+	if (UTile** FoundTile = TilesByComponent.Find(VitruvioComponent))
+	{
+		UTile* Tile = *FoundTile;
+		Tile->MarkForAttributeEvaluation(VitruvioComponent, CallbackProxy);
+	}
+}
+
+void FGrid::MarkAllForAttributeEvaluation()
+{
+	for (const auto& [Component, Tile] : TilesByComponent)
+	{
+		Tile->MarkForGenerate(Component);
+	}
+}
+
 void FGrid::MarkForGenerate(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy)
 {
 	if (UTile** FoundTile = TilesByComponent.Find(VitruvioComponent))
@@ -94,15 +132,15 @@ void FGrid::MarkAllForGenerate()
 	}
 }
 
-void FGrid::RegisterAll(const TSet<UVitruvioComponent*>& VitruvioComponents, AVitruvioBatchActor* VitruvioBatchActor)
+void FGrid::RegisterAll(const TSet<UVitruvioComponent*>& VitruvioComponents, AVitruvioBatchActor* VitruvioBatchActor, bool bGeneateModel)
 {
 	for (UVitruvioComponent* VitruvioComponent : VitruvioComponents)
 	{
-		Register(VitruvioComponent, VitruvioBatchActor);
+		Register(VitruvioComponent, VitruvioBatchActor, bGeneateModel);
 	} 
 }
 
-void FGrid::Register(UVitruvioComponent* VitruvioComponent, AVitruvioBatchActor* VitruvioBatchActor)
+void FGrid::Register(UVitruvioComponent* VitruvioComponent, AVitruvioBatchActor* VitruvioBatchActor, bool bGenerateModel)
 {
 	const FIntPoint Position = VitruvioBatchActor->GetPosition(VitruvioComponent);
 	
@@ -121,7 +159,10 @@ void FGrid::Register(UVitruvioComponent* VitruvioComponent, AVitruvioBatchActor*
 	if (!Tile->Contains(VitruvioComponent))
 	{
 		Tile->Add(VitruvioComponent);
-		Tile->MarkForGenerate(VitruvioComponent);
+		if (bGenerateModel)
+		{
+			Tile->MarkForGenerate(VitruvioComponent);
+		}
 		TilesByComponent.Add(VitruvioComponent, Tile);
 	}
 }
@@ -167,22 +208,38 @@ void FGrid::Clear()
 TArray<UTile*> FGrid::GetTilesMarkedForGenerate() const
 {
 	TArray<UTile*> TilesToGenerate;
-	for (auto& [Point, Tile] : Tiles)
-	{
-		if (Tile->bMarkedForGenerate)
-		{
-			TilesToGenerate.Add(Tile);
-		}
-	}
+	Tiles.GenerateValueArray(TilesToGenerate);
 
-	return TilesToGenerate;
+	return TilesToGenerate.FilterByPredicate([](const UTile* Tile)
+	{
+		return Tile->bMarkedForGenerate;
+	});
 }
 
-void FGrid::UnmarkForGenerate()
+TArray<UTile*> FGrid::GetTilesMarkedForAttributeEvaluation() const
+{
+	TArray<UTile*> TilesToGenerate;
+	Tiles.GenerateValueArray(TilesToGenerate);
+
+	return TilesToGenerate.FilterByPredicate([](const UTile* Tile)
+	{
+		return Tile->bMarkedForEvaluateAttributes;
+	});
+}
+
+void FGrid::UnmarkAllForGenerate()
 {
 	for (auto& [Point, Tile] : Tiles)
 	{
 		Tile->UnmarkForGenerate();
+	}
+}
+
+void FGrid::UnmarkAllForAttributeEvaluation()
+{
+	for (auto& [Point, Tile] : Tiles)
+	{
+		Tile->UnmarkForAttributeEvaluation();
 	}
 }
 
@@ -246,10 +303,13 @@ void AVitruvioBatchActor::ProcessTiles()
 			Tile->GeneratedModelComponent = VitruvioModelComponent;
 		}
 
-		// Generate model
 		auto [InitialShapes, InitialShapeVitruvioComponents] = Tile->GetInitialShapes();
 		if (!InitialShapes.IsEmpty())
 		{
+			if (Tile->EvalAttributesToken)
+			{
+				Tile->EvalAttributesToken->Invalidate();
+			}
 			if (Tile->GenerateToken)
 			{
 				Tile->GenerateToken->Invalidate();
@@ -277,26 +337,64 @@ void AVitruvioBatchActor::ProcessTiles()
 
 				Tile->GenerateToken.Reset();
 
-				FScopeLock GenerateQueueLock(&WeakThis->ProcessQueueCriticalSection);
+				FScopeLock QueueLock(&WeakThis->ProcessGenerateQueueCriticalSection);
 				WeakThis->GenerateQueue.Enqueue({Result.Value, Tile, InitialShapeVitruvioComponents});
 			});
 			// clang-format on
 		}
 	}
 
-	Grid.UnmarkForGenerate();
+	for (UTile* Tile : Grid.GetTilesMarkedForAttributeEvaluation())
+	{
+		auto [InitialShapes, InitialShapeVitruvioComponents] = Tile->GetInitialShapes();
+		if (!InitialShapes.IsEmpty())
+		{
+			if (Tile->EvalAttributesToken)
+			{
+				Tile->EvalAttributesToken->Invalidate();
+			}
+			
+			FAttributeMapsResult AttributeMapsResult = VitruvioModule::Get().BatchEvaluateRuleAttributesAsync(MoveTemp(InitialShapes));
+			
+			Tile->EvalAttributesToken = AttributeMapsResult.Token;
+			Tile->bIsEvaluatingAttributes = true;
+
+			AttributeMapsResult.Result.Next([WeakThis = MakeWeakObjectPtr(this), Tile, InitialShapeVitruvioComponents](const FAttributeMapsResult::ResultType& Result)
+			{
+				if (!WeakThis.IsValid())
+				{
+					return;
+				}
+				
+				FScopeLock Lock(&Result.Token->Lock);
+
+				if (Result.Token->IsInvalid())
+				{
+					return;
+				}
+
+				Tile->EvalAttributesToken.Reset();
+
+				FScopeLock QueueLock(&WeakThis->ProcessAttributeEvaluationQueueCriticalSection);
+				WeakThis->AttributeEvaluationQueue.Enqueue({Result.Value, Tile, InitialShapeVitruvioComponents});
+			});
+		}
+	}
+	
+	Grid.UnmarkAllForGenerate();
+	Grid.UnmarkAllForAttributeEvaluation();
 }
 
 void AVitruvioBatchActor::ProcessGenerateQueue()
 {
-	ProcessQueueCriticalSection.Lock();
+	ProcessGenerateQueueCriticalSection.Lock();
 	
 	if (!GenerateQueue.IsEmpty())
 	{
 		FBatchGenerateQueueItem Item;
 		GenerateQueue.Dequeue(Item);
 
-		ProcessQueueCriticalSection.Unlock();
+		ProcessGenerateQueueCriticalSection.Unlock();
 
 		for (int ComponentIndex = 0; ComponentIndex < Item.VitruvioComponents.Num(); ++ComponentIndex)
 		{
@@ -369,19 +467,19 @@ void AVitruvioBatchActor::ProcessGenerateQueue()
 			InstancedComponent->RegisterComponent();
 		}
 
-		for (auto& [VitruvioComponent, CallbackProxy] : Item.Tile->CallbackProxies)
+		for (auto& [VitruvioComponent, CallbackProxy] : Item.Tile->GenerateCallbackProxies)
 		{
 			CallbackProxy->OnGenerateCompletedBlueprint.Broadcast();
 			CallbackProxy->OnGenerateCompleted.Broadcast();
 			CallbackProxy->SetReadyToDestroy();
 		}
 
-		Item.Tile->CallbackProxies.Empty();
+		Item.Tile->GenerateCallbackProxies.Empty();
 		Item.Tile->bIsGenerating = false;
 	}
 	else
 	{
-		ProcessQueueCriticalSection.Unlock();
+		ProcessGenerateQueueCriticalSection.Unlock();
 	}
 
 	if (GenerateAllCallbackProxy)
@@ -397,16 +495,48 @@ void AVitruvioBatchActor::ProcessGenerateQueue()
 	}
 }
 
+void AVitruvioBatchActor::ProcessAttributeEvaluationQueue()
+{
+	ProcessAttributeEvaluationQueueCriticalSection.Lock();
+	
+	if (!AttributeEvaluationQueue.IsEmpty())
+	{
+		FEvaluateAttributesQueueItem Item;
+		AttributeEvaluationQueue.Dequeue(Item);
+
+		ProcessAttributeEvaluationQueueCriticalSection.Unlock();
+
+		for (int ComponentIndex = 0; ComponentIndex < Item.VitruvioComponents.Num(); ++ComponentIndex)
+		{
+			UVitruvioComponent* VitruvioComponent = Item.VitruvioComponents[ComponentIndex];
+			Item.AttributeMaps[ComponentIndex]->UpdateUnrealAttributeMap(VitruvioComponent->Attributes, VitruvioComponent);
+			VitruvioComponent->bAttributesReady = true;
+			VitruvioComponent->NotifyAttributesChanged();
+		}
+	}
+	else
+	{
+		ProcessAttributeEvaluationQueueCriticalSection.Unlock();
+	}
+}
+
 void AVitruvioBatchActor::Tick(float DeltaSeconds)
 {
 	ProcessTiles();
+	
+	ProcessAttributeEvaluationQueue();
 	ProcessGenerateQueue();
 }
 
-void AVitruvioBatchActor::RegisterVitruvioComponent(UVitruvioComponent* VitruvioComponent)
+void AVitruvioBatchActor::RegisterVitruvioComponent(UVitruvioComponent* VitruvioComponent, bool bGenerateModel)
 {
+	if (VitruvioComponents.Contains(VitruvioComponent))
+	{
+		return;
+	}
+	
 	VitruvioComponents.Add(VitruvioComponent);
-	Grid.Register(VitruvioComponent, this);
+	Grid.Register(VitruvioComponent, this, bGenerateModel);
 }
 
 void AVitruvioBatchActor::UnregisterVitruvioComponent(UVitruvioComponent* VitruvioComponent)
@@ -424,6 +554,17 @@ void AVitruvioBatchActor::UnregisterAllVitruvioComponents()
 TSet<UVitruvioComponent*> AVitruvioBatchActor::GetVitruvioComponents()
 {
 	return VitruvioComponents;
+}
+
+void AVitruvioBatchActor::EvaluateAttributes(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy)
+{
+	Grid.MarkForAttributeEvaluation(VitruvioComponent, CallbackProxy);
+}
+
+void AVitruvioBatchActor::EvaluateAllAttributes(UGenerateCompletedCallbackProxy* CallbackProxy)
+{
+	EvaluateAllCallbackProxy = CallbackProxy;
+	Grid.MarkAllForAttributeEvaluation();
 }
 
 void AVitruvioBatchActor::Generate(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy)

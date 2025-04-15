@@ -56,7 +56,7 @@ UGenerateCompletedCallbackProxy* ExecuteIfComponentValid(const FString& Function
 } // namespace
 
 UGenerateCompletedCallbackProxy* UGenerateCompletedCallbackProxy::SetRpk(UVitruvioComponent* VitruvioComponent, URulePackage* RulePackage,
-																		 bool bGenerateModel)
+																		 bool bEvaluateAttributes, bool bGenerateModel)
 {
 	return ExecuteIfComponentValid(TEXT("SetRpk"), VitruvioComponent, [RulePackage, bGenerateModel](UGenerateCompletedCallbackProxy* Proxy, UVitruvioComponent* VitruvioComponent)
 	{
@@ -65,11 +65,11 @@ UGenerateCompletedCallbackProxy* UGenerateCompletedCallbackProxy::SetRpk(UVitruv
 }
 
 UGenerateCompletedCallbackProxy* UGenerateCompletedCallbackProxy::SetRandomSeed(UVitruvioComponent* VitruvioComponent, int32 NewRandomSeed,
-																				bool bGenerateModel)
+																				bool bEvaluateAttributes, bool bGenerateModel)
 {
-	return ExecuteIfComponentValid(TEXT("SetRandomSeed"), VitruvioComponent, [NewRandomSeed, bGenerateModel](UGenerateCompletedCallbackProxy* Proxy, UVitruvioComponent* VitruvioComponent)
+	return ExecuteIfComponentValid(TEXT("SetRandomSeed"), VitruvioComponent, [NewRandomSeed, bGenerateModel, bEvaluateAttributes](UGenerateCompletedCallbackProxy* Proxy, UVitruvioComponent* VitruvioComponent)
 	{
-		VitruvioComponent->SetRandomSeed(NewRandomSeed, bGenerateModel, Proxy);
+		VitruvioComponent->SetRandomSeed(NewRandomSeed, bEvaluateAttributes, bGenerateModel, Proxy);
 	});
 }
 
@@ -82,89 +82,98 @@ UGenerateCompletedCallbackProxy* UGenerateCompletedCallbackProxy::Generate(UVitr
 }
 
 UGenerateCompletedCallbackProxy* UGenerateCompletedCallbackProxy::SetFloatAttribute(UVitruvioComponent* VitruvioComponent, const FString& Name,
-																					float Value, bool bGenerateModel)
+	float Value, bool bEvaluateAttributes, bool bGenerateModel)
 {
-	return ExecuteIfComponentValid(TEXT("SetFloatAttribute"), VitruvioComponent, [&Name, &Value, bGenerateModel](UGenerateCompletedCallbackProxy* Proxy, UVitruvioComponent* VitruvioComponent)
+	return ExecuteIfComponentValid(TEXT("SetFloatAttribute"), VitruvioComponent, [&Name, &Value, bEvaluateAttributes, bGenerateModel](UGenerateCompletedCallbackProxy* Proxy, UVitruvioComponent* VitruvioComponent)
 	{
-		VitruvioComponent->SetFloatAttribute(Name, Value, bGenerateModel, Proxy);
+		VitruvioComponent->SetFloatAttribute(Name, Value, bEvaluateAttributes, bGenerateModel, Proxy);
 	});
 }
 
 UGenerateCompletedCallbackProxy* UGenerateCompletedCallbackProxy::SetStringAttribute(UVitruvioComponent* VitruvioComponent, const FString& Name,
-																					 const FString& Value, bool bGenerateModel)
+	const FString& Value, bool bEvaluateAttributes, bool bGenerateModel)
 {
-	return ExecuteIfComponentValid(TEXT("SetStringAttribute"), VitruvioComponent, [&Name, &Value, bGenerateModel](UGenerateCompletedCallbackProxy* Proxy, UVitruvioComponent* VitruvioComponent)
+	return ExecuteIfComponentValid(TEXT("SetStringAttribute"), VitruvioComponent, [&Name, &Value, bEvaluateAttributes, bGenerateModel](UGenerateCompletedCallbackProxy* Proxy, UVitruvioComponent* VitruvioComponent)
 	{
-		VitruvioComponent->SetStringAttribute(Name, Value, bGenerateModel, Proxy);
+		VitruvioComponent->SetStringAttribute(Name, Value, bEvaluateAttributes, bGenerateModel, Proxy);
 	});
 }
 
 UGenerateCompletedCallbackProxy* UGenerateCompletedCallbackProxy::SetBoolAttribute(UVitruvioComponent* VitruvioComponent, const FString& Name,
-																				   bool Value, bool bGenerateModel)
+	bool Value, bool bEvaluateAttributes, bool bGenerateModel)
 {
-	return ExecuteIfComponentValid(TEXT("SetBoolAttribute"), VitruvioComponent, [&Name, &Value, bGenerateModel](UGenerateCompletedCallbackProxy* Proxy, UVitruvioComponent* VitruvioComponent)
+	return ExecuteIfComponentValid(TEXT("SetBoolAttribute"), VitruvioComponent, [&Name, &Value, bEvaluateAttributes, bGenerateModel](UGenerateCompletedCallbackProxy* Proxy, UVitruvioComponent* VitruvioComponent)
 	{
-		VitruvioComponent->SetBoolAttribute(Name, Value, bGenerateModel, Proxy);
+		VitruvioComponent->SetBoolAttribute(Name, Value, bEvaluateAttributes, bGenerateModel, Proxy);
 	});
 }
 
 UGenerateCompletedCallbackProxy* UGenerateCompletedCallbackProxy::SetFloatArrayAttribute(UVitruvioComponent* VitruvioComponent, const FString& Name,
-																						 const TArray<double>& Values, bool bGenerateModel)
+	const TArray<double>& Values, bool bEvaluateAttributes, bool bGenerateModel)
 {
-	return ExecuteIfComponentValid(TEXT("SetFloatArrayAttribute"), VitruvioComponent, [&Name, &Values, bGenerateModel](UGenerateCompletedCallbackProxy* Proxy, UVitruvioComponent* VitruvioComponent)
+	return ExecuteIfComponentValid(TEXT("SetFloatArrayAttribute"), VitruvioComponent, [&Name, &Values, bEvaluateAttributes, bGenerateModel](UGenerateCompletedCallbackProxy* Proxy, UVitruvioComponent* VitruvioComponent)
 	{
-		VitruvioComponent->SetFloatArrayAttribute(Name, Values, bGenerateModel, Proxy);
+		VitruvioComponent->SetFloatArrayAttribute(Name, Values, bEvaluateAttributes, bGenerateModel, Proxy);
 	});
 }
 
 UGenerateCompletedCallbackProxy* UGenerateCompletedCallbackProxy::SetStringArrayAttribute(UVitruvioComponent* VitruvioComponent, const FString& Name,
-																						  const TArray<FString>& Values, bool bGenerateModel)
+	const TArray<FString>& Values, bool bEvaluateAttributes, bool bGenerateModel)
 {
-	return ExecuteIfComponentValid(TEXT("SetStringArrayAttribute"), VitruvioComponent, [&Name, &Values, bGenerateModel](UGenerateCompletedCallbackProxy* Proxy, UVitruvioComponent* VitruvioComponent)
+	return ExecuteIfComponentValid(TEXT("SetStringArrayAttribute"), VitruvioComponent, [&Name, &Values, bEvaluateAttributes, bGenerateModel](UGenerateCompletedCallbackProxy* Proxy, UVitruvioComponent* VitruvioComponent)
 	{
-		VitruvioComponent->SetStringArrayAttribute(Name, Values, bGenerateModel, Proxy);
+		VitruvioComponent->SetStringArrayAttribute(Name, Values, bEvaluateAttributes, bGenerateModel, Proxy);
 	});
 }
 
 UGenerateCompletedCallbackProxy* UGenerateCompletedCallbackProxy::SetBoolArrayAttribute(UVitruvioComponent* VitruvioComponent, const FString& Name,
-																						const TArray<bool>& Values, bool bGenerateModel)
+	const TArray<bool>& Values, bool bEvaluateAttributes, bool bGenerateModel)
 {
-	return ExecuteIfComponentValid(TEXT("SetBoolArrayAttribute"), VitruvioComponent, [&Name, &Values, bGenerateModel](UGenerateCompletedCallbackProxy* Proxy, UVitruvioComponent* VitruvioComponent)
+	return ExecuteIfComponentValid(TEXT("SetBoolArrayAttribute"), VitruvioComponent, [&Name, &Values, bEvaluateAttributes, bGenerateModel](UGenerateCompletedCallbackProxy* Proxy, UVitruvioComponent* VitruvioComponent)
 	{
-		VitruvioComponent->SetBoolArrayAttribute(Name, Values, bGenerateModel, Proxy);
+		VitruvioComponent->SetBoolArrayAttribute(Name, Values, bEvaluateAttributes, bGenerateModel, Proxy);
 	});
 }
 
 UGenerateCompletedCallbackProxy* UGenerateCompletedCallbackProxy::SetAttributes(UVitruvioComponent* VitruvioComponent,
-																				const TMap<FString, FString>& NewAttributes, bool bGenerateModel)
+	const TMap<FString, FString>& NewAttributes, bool bEvaluateAttributes, bool bGenerateModel)
 {
-	return ExecuteIfComponentValid(TEXT("SetAttributes"), VitruvioComponent, [&NewAttributes, bGenerateModel](UGenerateCompletedCallbackProxy* Proxy, UVitruvioComponent* VitruvioComponent)
+	return ExecuteIfComponentValid(TEXT("SetAttributes"), VitruvioComponent, [&NewAttributes, bEvaluateAttributes, bGenerateModel](UGenerateCompletedCallbackProxy* Proxy, UVitruvioComponent* VitruvioComponent)
 	{
-		VitruvioComponent->SetAttributes(NewAttributes, bGenerateModel, Proxy);
+		VitruvioComponent->SetAttributes(NewAttributes, bEvaluateAttributes, bGenerateModel, Proxy);
 	});
 }
 
 UGenerateCompletedCallbackProxy* UGenerateCompletedCallbackProxy::SetMeshInitialShape(UVitruvioComponent* VitruvioComponent, UStaticMesh* StaticMesh,
-																					  bool bGenerateModel)
+	bool bEvaluateAttributes, bool bGenerateModel)
 {
-	return ExecuteIfComponentValid(TEXT("SetMeshInitialShape"), VitruvioComponent, [StaticMesh, bGenerateModel](UGenerateCompletedCallbackProxy* Proxy, UVitruvioComponent* VitruvioComponent)
+	return ExecuteIfComponentValid(TEXT("SetMeshInitialShape"), VitruvioComponent, [StaticMesh, bEvaluateAttributes, bGenerateModel](UGenerateCompletedCallbackProxy* Proxy, UVitruvioComponent* VitruvioComponent)
 	{
-		VitruvioComponent->SetMeshInitialShape(StaticMesh, bGenerateModel, Proxy);
+		VitruvioComponent->SetMeshInitialShape(StaticMesh, bEvaluateAttributes, bGenerateModel, Proxy);
 	});
 }
 
 UGenerateCompletedCallbackProxy* UGenerateCompletedCallbackProxy::SetSplineInitialShape(UVitruvioComponent* VitruvioComponent,
-																						const TArray<FSplinePoint>& SplinePoints, bool bGenerateModel)
+	const TArray<FSplinePoint>& SplinePoints, bool bEvaluateAttributes, bool bGenerateModel)
 {
-	return ExecuteIfComponentValid(TEXT("SetSplineInitialShape"), VitruvioComponent, [&SplinePoints, bGenerateModel](UGenerateCompletedCallbackProxy* Proxy, UVitruvioComponent* VitruvioComponent)
+	return ExecuteIfComponentValid(TEXT("SetSplineInitialShape"), VitruvioComponent, [&SplinePoints, bEvaluateAttributes, bGenerateModel](UGenerateCompletedCallbackProxy* Proxy, UVitruvioComponent* VitruvioComponent)
 	{
-		VitruvioComponent->SetSplineInitialShape(SplinePoints, bGenerateModel, Proxy);
+		VitruvioComponent->SetSplineInitialShape(SplinePoints, bEvaluateAttributes, bGenerateModel, Proxy);
+	});
+}
+
+UGenerateCompletedCallbackProxy* UGenerateCompletedCallbackProxy::SetPolygonInitialShape(UVitruvioComponent* VitruvioComponent, const FInitialShapePolygon& InitialShapePolygon,
+	bool bEvaluateAttributes, bool bGenerateModel)
+{
+	return ExecuteIfComponentValid(TEXT("SetSplineInitialShape"), VitruvioComponent, [InitialShapePolygon, bEvaluateAttributes, bGenerateModel](UGenerateCompletedCallbackProxy* Proxy, UVitruvioComponent* VitruvioComponent)
+	{
+		VitruvioComponent->SetPolygonInitialShape(InitialShapePolygon, bEvaluateAttributes, bGenerateModel, Proxy);
 	});
 }
 
 UGenerateCompletedCallbackProxy* UGenerateCompletedCallbackProxy::ConvertToVitruvioActor(UObject* WorldContextObject, const TArray<AActor*>& Actors,
-																						 TArray<AVitruvioActor*>& OutVitruvioActors,
-																						 URulePackage* Rpk, bool bGenerateModels, bool bBatchGeneration)
+                                                                                         TArray<AVitruvioActor*>& OutVitruvioActors,
+                                                                                         URulePackage* Rpk, bool bGenerateModels, bool bBatchGeneration)
 {
 	UGenerateCompletedCallbackProxy* Proxy = NewObject<UGenerateCompletedCallbackProxy>();
 	Proxy->RegisterWithGameInstance(WorldContextObject);
