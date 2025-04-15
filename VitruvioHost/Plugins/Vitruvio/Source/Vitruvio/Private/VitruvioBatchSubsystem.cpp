@@ -71,7 +71,7 @@ AVitruvioBatchActor* UVitruvioBatchSubsystem::GetBatchActor()
 			
 			for (UVitruvioComponent* VitruvioComponent : RegisteredComponents)
 			{
-				VitruvioBatchActor->RegisterVitruvioComponent(VitruvioComponent);
+				RegisterVitruvioComponent(VitruvioComponent); 
 			}
 		}
 	}
