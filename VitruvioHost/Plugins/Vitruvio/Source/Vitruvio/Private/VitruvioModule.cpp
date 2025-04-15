@@ -721,7 +721,7 @@ TArray<FAttributeMapPtr> VitruvioModule::BatchEvaluateRuleAttributes(TArray<FIni
 		RuleInfoInitialShapes.Add(MakeTuple(StartRuleInfo, MoveTemp(InitialShapesByRpk)));
 	}
 	
-	auto ForeachInitialShape = [&RuleInfoInitialShapes](auto Fun)
+	auto ForeachInitialShape = [&](auto Fun)
 	{
 		int InitialShapeIndex = 0;
 		for (auto& [StartRuleInfo, InitialShapesByRpk] : RuleInfoInitialShapes)
@@ -739,7 +739,7 @@ TArray<FAttributeMapPtr> VitruvioModule::BatchEvaluateRuleAttributes(TArray<FIni
 	InitialShapeUPtrVector InitialShapeUPtrs;
 	InitialShapeNOPtrVector InitialShapePtrs;
 
-	ForeachInitialShape([&InitialShapeBuilders, &InitialShapeUPtrs, &InitialShapePtrs]
+	ForeachInitialShape([&]
 		(int32 InitialShapeIndex, const FInitialShape& InitialShape, const FStartRuleInfo& StartRuleInfo)
 	{
 		InitialShapeBuilderUPtr InitialShapeBuilder(prt::InitialShapeBuilder::create());
@@ -783,7 +783,7 @@ TArray<FAttributeMapPtr> VitruvioModule::BatchEvaluateRuleAttributes(TArray<FIni
 			return {};
 		}
 		
-		ForeachInitialShape([&EvaluateAttributeMapBuilders, &EvaluatedAttributes]
+		ForeachInitialShape([&]
 			(int32 InitialShapeIndex, const FInitialShape& InitialShape, const FStartRuleInfo& StartRuleInfo)
 		{
 			const FAttributeMapPtr AttributeMap = MakeShared<FAttributeMap>(
