@@ -467,6 +467,8 @@ void AVitruvioBatchActor::ProcessGenerateQueue()
 
 		for (auto& [VitruvioComponent, CallbackProxy] : Item.Tile->GenerateCallbackProxies)
 		{
+			CallbackProxy->OnAttributesEvaluatedBlueprint.Broadcast();
+			CallbackProxy->OnAttributesEvaluated.Broadcast();
 			CallbackProxy->OnGenerateCompletedBlueprint.Broadcast();
 			CallbackProxy->OnGenerateCompleted.Broadcast();
 			CallbackProxy->SetReadyToDestroy();
