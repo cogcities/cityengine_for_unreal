@@ -33,7 +33,6 @@ void UTile::MarkForAttributeEvaluation(UVitruvioComponent* VitruvioComponent, UG
 void UTile::UnmarkForAttributeEvaluation()
 {
 	bMarkedForEvaluateAttributes = false;
-	EvaluateAttributesCallbackProxies.Empty();
 }
 
 void UTile::MarkForGenerate(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy)
@@ -53,7 +52,6 @@ void UTile::MarkForGenerate(UVitruvioComponent* VitruvioComponent, UGenerateComp
 void UTile::UnmarkForGenerate()
 {
 	bMarkedForGenerate = false;
-	GenerateCallbackProxies.Empty();
 }
 
 void UTile::Add(UVitruvioComponent* VitruvioComponent)
