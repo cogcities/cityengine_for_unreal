@@ -391,6 +391,10 @@ public:
 	/** Returns the attributes used for generation. */
 	UFUNCTION(BlueprintCallable, Category = "Vitruvio")
 	const TMap<FString, URuleAttribute*>& GetAttributes() const;
+	
+	/** Returns the attributes used for generation. */
+	UFUNCTION(BlueprintCallable, Category = "Vitruvio")
+	TMap<FString, FString> GetUserSetAttributes() const;
 
 	/** Returns the rule package used for generation. */
 	UFUNCTION(BlueprintCallable, Category = "Vitruvio")

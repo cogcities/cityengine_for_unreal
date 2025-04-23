@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include "RulePackage.h"
 #include "Components/SplineComponent.h"
 
 #include "InitialShape.generated.h"
@@ -106,6 +107,27 @@ struct VITRUVIO_API FInitialShapePolygon
 	{
 		return !(Lhs == RHS);
 	}
+};
+
+USTRUCT(BlueprintType)
+struct FInitialShapeData
+{
+	GENERATED_BODY()
+	
+	UPROPERTY(BlueprintReadWrite, Category = "Vitruvio")
+	FVector Position;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Vitruvio")
+	FInitialShapePolygon Polygon;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Vitruvio")
+	TMap<FString, FString> Attributes;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Vitruvio")
+	int32 RandomSeed = 0;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Vitruvio")
+	URulePackage* RulePackage = nullptr;
 };
 
 UCLASS(Abstract)

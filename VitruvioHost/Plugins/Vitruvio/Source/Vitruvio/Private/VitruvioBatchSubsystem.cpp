@@ -53,6 +53,11 @@ void UVitruvioBatchSubsystem::GenerateAll(UGenerateCompletedCallbackProxy* Callb
 	GetBatchActor()->GenerateAll(CallbackProxy);
 }
 
+void UVitruvioBatchSubsystem::AddBatchedInitialShape(const FInitialShapeData& InitialShape)
+{
+	GetBatchActor()->AddBatchedInitialShape(InitialShape);
+}
+
 AVitruvioBatchActor* UVitruvioBatchSubsystem::GetBatchActor()
 {
 	if (!VitruvioBatchActor)

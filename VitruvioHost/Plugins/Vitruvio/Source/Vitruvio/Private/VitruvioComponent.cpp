@@ -708,6 +708,20 @@ const TMap<FString, URuleAttribute*>& UVitruvioComponent::GetAttributes() const
 	return Attributes;
 }
 
+TMap<FString, FString> UVitruvioComponent::GetUserSetAttributes() const
+{
+	TMap<FString, FString> AttributeMap;
+	for (const auto& [Key, Value] : Attributes)
+	{
+		if (Value->bUserSet)
+		{
+			AttributeMap.Add(Key, Value->GetValueAsString());
+		}
+	}
+
+	return AttributeMap;
+}
+
 URulePackage* UVitruvioComponent::GetRpk() const
 {
 	return Rpk;
@@ -1142,7 +1156,7 @@ void UVitruvioComponent::Generate(UGenerateCompletedCallbackProxy* CallbackProxy
 	if (InitialShape)
 	{
 		FGenerateResult GenerateResult =
-			VitruvioModule::Get().GenerateAsync({ FVector::ZeroVector, InitialShape->GetPolygon(), Vitruvio::CreateAttributeMap(Attributes), RandomSeed, Rpk});
+			VitruvioModule::Get().GenerateAsync({ FVector::ZeroVector, InitialShape->GetPolygon(), GetUserSetAttributes(), RandomSeed, Rpk});
 
 		GenerateToken = GenerateResult.Token;
 
@@ -1365,7 +1379,7 @@ void UVitruvioComponent::EvaluateRuleAttributes(bool ForceRegenerate, UGenerateC
 	bAttributesReady = false;
 
 	FAttributeMapResult AttributesResult =
-		VitruvioModule::Get().EvaluateRuleAttributesAsync({ FVector::ZeroVector, InitialShape->GetPolygon(), Vitruvio::CreateAttributeMap(Attributes), RandomSeed, Rpk});
+		VitruvioModule::Get().EvaluateRuleAttributesAsync({ FVector::ZeroVector, InitialShape->GetPolygon(), GetUserSetAttributes(), RandomSeed, Rpk});
 
 	EvalAttributesInvalidationToken = AttributesResult.Token;
 

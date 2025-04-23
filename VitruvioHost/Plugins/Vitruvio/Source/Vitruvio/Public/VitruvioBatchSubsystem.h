@@ -41,6 +41,8 @@ public:
 	void Generate(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
 	void GenerateAll(UGenerateCompletedCallbackProxy* CallbackProxy);
 
+	void AddBatchedInitialShape(const FInitialShapeData& InitialShape);
+
 	AVitruvioBatchActor* GetBatchActor();
 	bool HasRegisteredVitruvioComponents() const;
 

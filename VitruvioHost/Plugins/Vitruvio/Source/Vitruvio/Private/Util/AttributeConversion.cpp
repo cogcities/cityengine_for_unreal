@@ -24,6 +24,50 @@
 #include "RuleAttributes.h"
 #include "Misc/DefaultValueHelper.h"
 
+namespace Util
+{
+
+bool TryParseDouble(const FString& InStr, double& OutValue)
+{
+	return FDefaultValueHelper::ParseDouble(InStr, OutValue);
+}
+
+bool IsDouble(const FString& InStr)
+{
+	double Value;
+	return TryParseDouble(InStr, Value);
+}
+
+bool TryParseBool(const FString& InStr, bool& OutValue)
+{
+	const FString Lower = InStr.ToLower();
+	if (Lower == TEXT("true") || Lower == TEXT("1"))
+	{
+		OutValue = true;
+		return true;
+	}
+	if (Lower == TEXT("false") || Lower == TEXT("0"))
+	{
+		OutValue = false;
+		return true;
+	}
+	return false;
+}
+
+bool IsBool(const FString& InStr)
+{
+	bool Value;
+	return TryParseBool(InStr, Value);
+}
+
+bool TryParseString(const FString& InStr, FString& OutValue)
+{
+	OutValue = InStr;
+	return true;
+}
+
+}
+
 namespace
 {
 const FString DEFAULT_STYLE = TEXT("Default");
@@ -298,22 +342,30 @@ bool IsAttributeBeforeOther(const URuleAttribute& Attribute, const URuleAttribut
 	return AreAttributesInOrder(Attribute, OtherAttribute);
 }
 
-template <class TAttribute, typename TValue>
+template <class TAttribute, typename TValue, typename TParseFun>
 requires std::is_base_of_v<URuleAttribute, TAttribute>
-TAttribute* CreateScalarAttribute(const FString& Key, const TValue& InValue)
+TAttribute* CreateScalarAttribute(const FString& Key, const FString& StringValue, TParseFun&& ParseFun)
 {
 	TAttribute* Attr = NewObject<TAttribute>();
-	Attr->Value = InValue;
+	TValue Value;
+	if (ParseFun(StringValue, Value))
+	{
+		Attr->Value = Value;
+	}
 	Attr->Name = Key;
 	Attr->DisplayName = Key;
 	Attr->bUserSet = true;
 	return Attr;
 }
 
-template <class TArrayAttribute, typename TValue, typename TParseFun>
-requires std::is_base_of_v<URuleAttribute, TArrayAttribute>
-TArrayAttribute* CreateArrayAttributeFromValues(const FString& Key, const TArray<FString>& Elements, TParseFun&& ParseFun)
+template <typename TValue, typename TParseFun>
+TArray<TValue> GetArrayValues(const FString& ArrayValuesString, TParseFun&& ParseFun)
 {
+	const FString Trimmed = ArrayValuesString.TrimStartAndEnd();
+	FString Inner = Trimmed.Mid(1, Trimmed.Len() - 2);
+	TArray<FString> Elements;
+	Inner.ParseIntoArray(Elements, TEXT(","), true);
+	
 	TArray<TValue> ParsedValues;
 
 	for (const FString& Element : Elements)
@@ -325,45 +377,68 @@ TArrayAttribute* CreateArrayAttributeFromValues(const FString& Key, const TArray
 		}
 	}
 
+	return ParsedValues;
+}
+
+template <class TArrayAttribute, typename TValue, typename TParseFun>
+requires std::is_base_of_v<URuleAttribute, TArrayAttribute>
+TArrayAttribute* CreateArrayAttribute(const FString& Key, const FString& ArrayValuesString, TParseFun&& ParseFun)
+{
 	TArrayAttribute* Attr = NewObject<TArrayAttribute>();
 	Attr->Name = Key;
 	Attr->DisplayName = Key;
 	Attr->bUserSet = true;
-	Attr->Values = ParsedValues;
+	Attr->Values = GetArrayValues<TValue>(ArrayValuesString, ParseFun);
 	return Attr;
+}
+
+prt::AnnotationArgumentType GetPrtValueType(const FString& Value)
+{
+	const FString Trimmed = Value.TrimStartAndEnd();
+
+	if (Trimmed.StartsWith(TEXT("[")) && Trimmed.EndsWith(TEXT("]")))
+	{
+		FString Inner = Trimmed.Mid(1, Trimmed.Len() - 2);
+		TArray<FString> Elements;
+		Inner.ParseIntoArray(Elements, TEXT(","), true);
+
+		if (Elements.Num() == 0)
+		{
+			return prt::AnnotationArgumentType::AAT_STR_ARRAY;
+		}
+
+		const FString& First = Elements[0];
+
+		if (Util::IsDouble(First))
+		{
+			return prt::AnnotationArgumentType::AAT_STR_ARRAY;
+		}
+		else if (Util::IsBool(First))
+		{
+			return prt::AnnotationArgumentType::AAT_BOOL_ARRAY;
+		}
+		else
+		{
+			return prt::AnnotationArgumentType::AAT_FLOAT_ARRAY;
+		}
+	}
+
+	if (Util::IsDouble(Trimmed))
+	{
+		return prt::AAT_FLOAT;
+	}
+	else if (Util::IsBool(Trimmed))
+	{
+		return prt::AAT_BOOL;
+	}
+	else
+	{
+		return prt::AAT_STR;
+	}
 }
 
 } // namespace
 
-namespace ParseUtils
-{
-bool TryParseDouble(const FString& InStr, double& OutValue)
-{
-	return FDefaultValueHelper::ParseDouble(InStr, OutValue);
-}
-
-bool TryParseBool(const FString& InStr, bool& OutValue)
-{
-	const FString Lower = InStr.ToLower();
-	if (Lower == TEXT("true") || Lower == TEXT("1"))
-	{
-		OutValue = true;
-		return true;
-	}
-	if (Lower == TEXT("false") || Lower == TEXT("0"))
-	{
-		OutValue = false;
-		return true;
-	}
-	return false;
-}
-
-bool TryParseString(const FString& InStr, FString& OutValue)
-{
-	OutValue = InStr;
-	return true;
-}
-}
 
 namespace Vitruvio
 {
@@ -446,7 +521,9 @@ AttributeMapUPtr CreateAttributeMap(const TMap<FString, URuleAttribute*>& Attrib
 		const URuleAttribute* Attribute = AttributeEntry.Value;
 
 		if (!Attribute->bUserSet)
+		{
 			continue;
+		}
 
 		if (const UFloatAttribute* FloatAttribute = Cast<UFloatAttribute>(Attribute))
 		{
@@ -480,53 +557,79 @@ AttributeMapUPtr CreateAttributeMap(const TMap<FString, URuleAttribute*>& Attrib
 	return AttributeMapUPtr(AttributeMapBuilder->createAttributeMap(), PRTDestroyer());
 }
 
+AttributeMapUPtr CreateAttributeMap(const TMap<FString, FString>& Attributes)
+{
+	AttributeMapBuilderUPtr AttributeMapBuilder(prt::AttributeMapBuilder::create());
+	
+	for (const auto& [Key, Value] : Attributes)
+	{
+		switch (GetPrtValueType(Value))
+		{
+		case prt::AAT_BOOL:
+		{
+			bool BoolValue;
+			if (Util::TryParseBool(Value, BoolValue))
+			{
+				AttributeMapBuilder->setBool(TCHAR_TO_WCHAR(*Key), BoolValue);
+			}
+			break;
+		}
+		case prt::AAT_INT:
+		case prt::AAT_FLOAT:
+		{
+			double DoubleValue;
+			if (Util::TryParseDouble(Value, DoubleValue))
+			{
+				AttributeMapBuilder->setFloat(TCHAR_TO_WCHAR(*Key), DoubleValue);
+			}
+			break;
+		}
+		case prt::AAT_BOOL_ARRAY:
+		{
+			TArray<bool> BoolArray = GetArrayValues<bool>(Value, Util::TryParseBool);
+			AttributeMapBuilder->setBoolArray(TCHAR_TO_WCHAR(*Key), BoolArray.GetData(), BoolArray.Num());
+			break;
+		}
+		case prt::AAT_FLOAT_ARRAY:
+		{
+			TArray<double> FloatArray = GetArrayValues<double>(Value, Util::TryParseDouble);
+			AttributeMapBuilder->setFloatArray(TCHAR_TO_WCHAR(*Key), FloatArray.GetData(), FloatArray.Num());
+			break;
+		}
+		case prt::AAT_STR_ARRAY:
+		{
+			TArray<FString> StringArray = GetArrayValues<FString>(Value, Util::TryParseString);
+			std::vector<const wchar_t*> PtrVec = ToPtrVector(StringArray);
+			AttributeMapBuilder->setStringArray(TCHAR_TO_WCHAR(*Key), PtrVec.data(), StringArray.Num());
+		}
+		case prt::AAT_STR:
+		default:
+			AttributeMapBuilder->setString(TCHAR_TO_WCHAR(*Key), TCHAR_TO_WCHAR(*Value));
+		}
+	}
+	
+	return AttributeMapUPtr(AttributeMapBuilder->createAttributeMap(), PRTDestroyer());
+}
+
 URuleAttribute* CreateAttribute(const FString& Key, const FString& Value)
 {
-	const FString Trimmed = Value.TrimStartAndEnd();
 
-	if (Trimmed.StartsWith(TEXT("[")) && Trimmed.EndsWith(TEXT("]")))
+	switch (GetPrtValueType(Value))
 	{
-		FString Inner = Trimmed.Mid(1, Trimmed.Len() - 2);
-		TArray<FString> Elements;
-		Inner.ParseIntoArray(Elements, TEXT(","), true);
-
-		if (Elements.Num() == 0)
-		{
-			return CreateArrayAttributeFromValues<UStringArrayAttribute, FString>(Key, {}, ParseUtils::TryParseString);
-		}
-
-		const FString& First = Elements[0];
-		double DummyFloat;
-		bool DummyBool;
-
-		if (ParseUtils::TryParseDouble(First, DummyFloat))
-		{
-			return CreateArrayAttributeFromValues<UFloatArrayAttribute, double>(Key, Elements, ParseUtils::TryParseDouble);
-		}
-		else if (ParseUtils::TryParseBool(First, DummyBool))
-		{
-			return CreateArrayAttributeFromValues<UBoolArrayAttribute, bool>(Key, Elements, ParseUtils::TryParseBool);
-		}
-		else
-		{
-			return CreateArrayAttributeFromValues<UStringArrayAttribute, FString>(Key, Elements, ParseUtils::TryParseString);
-		}
-	}
-
-	double ParsedFloat;
-	bool ParsedBool;
-
-	if (ParseUtils::TryParseDouble(Trimmed, ParsedFloat))
-	{
-		return CreateScalarAttribute<UFloatAttribute>(Key, ParsedFloat);
-	}
-	else if (ParseUtils::TryParseBool(Trimmed, ParsedBool))
-	{
-		return CreateScalarAttribute<UBoolAttribute>(Key, ParsedBool);
-	}
-	else
-	{
-		return CreateScalarAttribute<UStringAttribute>(Key, Trimmed);
+	case prt::AAT_BOOL:
+		return CreateScalarAttribute<UBoolAttribute, bool>(Key, Value, Util::TryParseBool);
+	case prt::AAT_INT:
+	case prt::AAT_FLOAT:
+		return CreateScalarAttribute<UFloatAttribute, double>(Key, Value, Util::TryParseDouble);
+	case prt::AAT_BOOL_ARRAY:
+		return CreateArrayAttribute<UBoolArrayAttribute, bool>(Key, Value, Util::TryParseBool);
+	case prt::AAT_FLOAT_ARRAY:
+		return CreateArrayAttribute<UFloatArrayAttribute, double>(Key, Value, Util::TryParseDouble);
+	case prt::AAT_STR_ARRAY:
+		return CreateArrayAttribute<UStringArrayAttribute, FString>(Key, Value, Util::TryParseString);
+	case prt::AAT_STR:
+	default:
+		return CreateScalarAttribute<UStringAttribute, FString>(Key, Value, ::Util::TryParseString);
 	}
 }
 } // namespace Vitruvio

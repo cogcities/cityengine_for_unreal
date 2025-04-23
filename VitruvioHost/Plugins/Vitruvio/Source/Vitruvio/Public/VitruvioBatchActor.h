@@ -63,7 +63,7 @@ public:
 	void Remove(UVitruvioComponent* VitruvioComponent);
 	bool Contains(UVitruvioComponent* VitruvioComponent) const;
 	
-	TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> GetInitialShapes();
+	TTuple<TArray<FInitialShapeData>, TArray<UVitruvioComponent*>> GetInitialShapes();
 };
 
 USTRUCT()
@@ -95,18 +95,49 @@ struct FGrid
 	void UnmarkAllForAttributeEvaluation();
 };
 
-struct FBatchGenerateQueueItem
+USTRUCT()
+struct FInitialShapeTile
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TArray<FInitialShapeData> InitialShapes;
+
+	UPROPERTY()
+	UGeneratedModelStaticMeshComponent* GeneratedModelComponent;
+
+	FBatchGenerateResult::FTokenPtr GenerateToken;
+
+	bool bDirty = false;
+	bool bIsGenerating = false;
+};
+
+USTRUCT(BlueprintType)
+struct FInitialShapeGrid
+{
+	GENERATED_BODY()
+	
+	TMap<FIntPoint, TSharedPtr<FInitialShapeTile>> InitialShapeTiles;
+};
+
+struct FComponentGenerateQueueItem
 {
 	FGenerateResultDescription GenerateResultDescription;
 	UTile* Tile;
 	TArray<UVitruvioComponent*> VitruvioComponents;
 };
 
-struct FEvaluateAttributesQueueItem
+struct FComponentEvaluateAttributesQueueItem
 {
 	TArray<FAttributeMapPtr> AttributeMaps;
 	UTile* Tile;
 	TArray<UVitruvioComponent*> VitruvioComponents;
+};
+
+struct FBatchGenerateQueueItem
+{
+	FGenerateResultDescription GenerateResultDescription;
+	FIntPoint TileIndex;
 };
 
 UCLASS(NotBlueprintable, NotPlaceable)
@@ -125,10 +156,15 @@ public:
 	
 private:
 	UPROPERTY(Transient)
-	FGrid Grid;
+	FGrid VitruvioComponentGrid;
 
-	TQueue<FBatchGenerateQueueItem> GenerateQueue;
-	TQueue<FEvaluateAttributesQueueItem> AttributeEvaluationQueue;
+	UPROPERTY(Transient)
+	FInitialShapeGrid InitialShapeGrid;
+
+	TQueue<FComponentGenerateQueueItem> ComponentGenerateQueue;
+	TQueue<FComponentEvaluateAttributesQueueItem> ComponentAttributeEvaluationQueue;
+
+	TQueue<FBatchGenerateQueueItem> BatchGenerateQueue;
 
 	UPROPERTY(Transient)
 	TMap<UMaterialInterface*, FString> MaterialIdentifiers;
@@ -173,8 +209,11 @@ public:
 	
 	void Generate(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
 	void GenerateAll(UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
-	
-	FIntPoint GetPosition(const UVitruvioComponent* VitruvioComponent) const;
+
+	void AddBatchedInitialShape(const FInitialShapeData& InitialShape);
+
+	FIntPoint GetTileLocation(const FVector& Position) const;
+	FIntPoint GetTileLocation(const UVitruvioComponent* VitruvioComponent) const;
 	
 #if WITH_EDITOR
 	virtual bool CanDeleteSelectedActor(FText& OutReason) const override;
@@ -201,8 +240,12 @@ private:
 	void ProcessGenerateQueue();
 	void ProcessAttributeEvaluationQueue();
 
+	void ProcessInitialShapeTiles();
+	void ProcessBatchGenerateQueue();
+
 	FCriticalSection ProcessGenerateQueueCriticalSection;
 	FCriticalSection ProcessAttributeEvaluationQueueCriticalSection;
+	FCriticalSection ProcessBatchGenerateQueueCriticalSection;
 
 	UPROPERTY()
 	UGenerateCompletedCallbackProxy* GenerateAllCallbackProxy;

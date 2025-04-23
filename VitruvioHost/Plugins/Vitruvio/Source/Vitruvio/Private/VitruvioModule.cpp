@@ -15,6 +15,7 @@
 
 #include "VitruvioModule.h"
 
+#include "AttributeConversion.h"
 #include "prt/API.h"
 
 #include "PRTTypes.h"
@@ -140,7 +141,7 @@ public:
 	}
 };
 
-void SetInitialShapeGeometry(const InitialShapeBuilderUPtr& InitialShapeBuilder, const FInitialShape& InitialShape)
+void SetInitialShapeGeometry(const InitialShapeBuilderUPtr& InitialShapeBuilder, const FInitialShapeData& InitialShape)
 {
 	std::vector<double> vertexCoords;
 	std::vector<uint32_t> indices;
@@ -150,7 +151,7 @@ void SetInitialShapeGeometry(const InitialShapeBuilderUPtr& InitialShapeBuilder,
 	for (int VertexIndex = 0; VertexIndex < InitialShape.Polygon.Vertices.Num(); ++ VertexIndex)
 	{
 		
-		const FVector Vertex = InitialShape.Offset + InitialShape.Polygon.Vertices[VertexIndex];
+		const FVector Vertex = InitialShape.Position + InitialShape.Polygon.Vertices[VertexIndex];
 		const FVector CEVertex = FVector(Vertex.X, Vertex.Z, Vertex.Y) / 100.0;
 		vertexCoords.push_back(CEVertex.X);
 		vertexCoords.push_back(CEVertex.Y);
@@ -220,7 +221,7 @@ void SetInitialShapeGeometry(const InitialShapeBuilderUPtr& InitialShapeBuilder,
 }
 
 AttributeMapUPtr EvaluateRuleAttributes(const std::wstring& RuleFile, const std::wstring& StartRule, 
-										const ResolveMapSPtr& ResolveMapPtr, const FInitialShape& InitialShape, prt::Cache* Cache)
+										const ResolveMapSPtr& ResolveMapPtr, const FInitialShapeData& InitialShape, prt::Cache* Cache)
 {
 	TArray<AttributeMapBuilderUPtr> AttributeMapBuilders;
 	AttributeMapBuilders.Add(AttributeMapBuilderUPtr(prt::AttributeMapBuilder::create()));
@@ -229,8 +230,9 @@ AttributeMapUPtr EvaluateRuleAttributes(const std::wstring& RuleFile, const std:
 	InitialShapeBuilderUPtr InitialShapeBuilder(prt::InitialShapeBuilder::create());
 
 	SetInitialShapeGeometry(InitialShapeBuilder, InitialShape);
-
-	InitialShapeBuilder->setAttributes(RuleFile.c_str(), StartRule.c_str(), InitialShape.RandomSeed, L"", InitialShape.Attributes.get(), ResolveMapPtr.get());
+	
+	AttributeMapUPtr AttributeMap = Vitruvio::CreateAttributeMap(InitialShape.Attributes);
+	InitialShapeBuilder->setAttributes(RuleFile.c_str(), StartRule.c_str(), InitialShape.RandomSeed, L"", AttributeMap.get(), ResolveMapPtr.get());
 
 	const InitialShapeUPtr Shape(InitialShapeBuilder->createInitialShapeAndReset());
 	const InitialShapeNOPtrVector InitialShapes = {Shape.get()};
@@ -389,21 +391,21 @@ Vitruvio::FTextureData VitruvioModule::DecodeTexture(UObject* Outer, const FStri
 	return Vitruvio::DecodeTexture(Outer, Key, Path, TextureMetadata, std::move(Buffer), BufferSize);
 }
 
-FBatchGenerateResult VitruvioModule::BatchGenerateAsync(TArray<FInitialShape> InitialShapes) const
+FBatchGenerateResult VitruvioModule::BatchGenerateAsync(const TArray<FInitialShapeData>& InitialShapes) const
 {
     const FBatchGenerateResult::FTokenPtr Token = MakeShared<FGenerateToken>();
     	
 	CHECK_PRT_INITIALIZED_ASYNC(FBatchGenerateResult, Token)
 
-	FBatchGenerateResult::FFutureType ResultFuture = Async(EAsyncExecution::Thread, [this, Token, InitialShapes = MoveTemp(InitialShapes)]() mutable {
-		FGenerateResultDescription Result = BatchGenerate(MoveTemp(InitialShapes));
+	FBatchGenerateResult::FFutureType ResultFuture = Async(EAsyncExecution::Thread, [this, Token, InitialShapes]() mutable {
+		FGenerateResultDescription Result = BatchGenerate(InitialShapes);
 		return FBatchGenerateResult::ResultType { Token, MoveTemp(Result) };
 	});
 
 	return FBatchGenerateResult { MoveTemp(ResultFuture), Token };
 }
 
-FGenerateResultDescription VitruvioModule::BatchGenerate(TArray<FInitialShape> InitialShapes) const
+FGenerateResultDescription VitruvioModule::BatchGenerate(const TArray<FInitialShapeData>& InitialShapes) const
 {
 	if (InitialShapes.IsEmpty())
 	{
@@ -414,19 +416,19 @@ FGenerateResultDescription VitruvioModule::BatchGenerate(TArray<FInitialShape> I
 
 	GenerateCallsCounter.Add(InitialShapes.Num());
 
-	TMap<URulePackage*, TArray<FInitialShape>> RulePackages;
-	for (FInitialShape& InitialShape : InitialShapes)
+	TMap<URulePackage*, TArray<FInitialShapeData>> RulePackages;
+	for (const FInitialShapeData& InitialShape : InitialShapes)
 	{
-		RulePackages.FindOrAdd(InitialShape.RulePackage).Add(MoveTemp(InitialShape));
+		RulePackages.FindOrAdd(InitialShape.RulePackage).Add(InitialShape);
 	}
 
-	TArray<TTuple<TFuture<ResolveMapSPtr>, TArray<FInitialShape>>> ResolveMapFutures;
+	TArray<TTuple<TFuture<ResolveMapSPtr>, TArray<FInitialShapeData>>> ResolveMapFutures;
 	for (auto& [RulePackage, InitialShapesByRpk] : RulePackages)
 	{
-		ResolveMapFutures.Add(MakeTuple(LoadResolveMapAsync(RulePackage), MoveTemp(InitialShapesByRpk)));
+		ResolveMapFutures.Add(MakeTuple(LoadResolveMapAsync(RulePackage), InitialShapesByRpk));
 	}
 
-	TArray<TTuple<FStartRuleInfo, TArray<FInitialShape>>> RuleInfoInitialShapes;
+	TArray<TTuple<FStartRuleInfo, TArray<FInitialShapeData>>> RuleInfoInitialShapes;
 	for (auto& [ResolveMapFuture, InitialShapesByRpk] : ResolveMapFutures)
 	{
 		const ResolveMapSPtr ResolveMap = ResolveMapFuture.Get();
@@ -439,7 +441,7 @@ FGenerateResultDescription VitruvioModule::BatchGenerate(TArray<FInitialShape> I
 		
 		FStartRuleInfo StartRuleInfo { ResolveMap, RuleFile.c_str(), StartRule.c_str(), RuleFileInfo };
 
-		RuleInfoInitialShapes.Add(MakeTuple(StartRuleInfo, MoveTemp(InitialShapesByRpk)));
+		RuleInfoInitialShapes.Add(MakeTuple(StartRuleInfo, InitialShapesByRpk));
 	}
 	
 	auto ForeachInitialShape = [&RuleInfoInitialShapes](auto Fun)
@@ -447,7 +449,7 @@ FGenerateResultDescription VitruvioModule::BatchGenerate(TArray<FInitialShape> I
 		int InitialShapeIndex = 0;
 		for (auto& [StartRuleInfo, InitialShapesByRpk] : RuleInfoInitialShapes)
 		{
-			for (const FInitialShape& InitialShape : InitialShapesByRpk)
+			for (const FInitialShapeData& InitialShape : InitialShapesByRpk)
 			{
 				Fun(InitialShapeIndex, InitialShape, StartRuleInfo);
 
@@ -455,22 +457,27 @@ FGenerateResultDescription VitruvioModule::BatchGenerate(TArray<FInitialShape> I
 			}
 		}
 	};
-	
+
+	TArray<AttributeMapUPtr> InitialShapeAttributeMaps;
 	TArray<InitialShapeBuilderUPtr> InitialShapeBuilders;
+	
 	InitialShapeUPtrVector InitialShapeUPtrs;
 	InitialShapeNOPtrVector InitialShapePtrs;
 
-	ForeachInitialShape([&InitialShapeBuilders, &InitialShapeUPtrs, &InitialShapePtrs]
-		(int32 InitialShapeIndex, const FInitialShape& InitialShape, const FStartRuleInfo& StartRuleInfo)
+	ForeachInitialShape([&InitialShapeBuilders, &InitialShapeUPtrs, &InitialShapePtrs, &InitialShapeAttributeMaps]
+		(int32, const FInitialShapeData& InitialShape, const FStartRuleInfo& StartRuleInfo)
 	{
 		InitialShapeBuilderUPtr InitialShapeBuilder(prt::InitialShapeBuilder::create());
 		SetInitialShapeGeometry(InitialShapeBuilder, InitialShape);
+
+		AttributeMapUPtr AttributeMap = Vitruvio::CreateAttributeMap(InitialShape.Attributes);
 		InitialShapeBuilder->setAttributes(*StartRuleInfo.RuleFile, *StartRuleInfo.StartRule, InitialShape.RandomSeed, L"",
-			InitialShape.Attributes.get(), StartRuleInfo.ResolveMap.get());
+			AttributeMap.get(), StartRuleInfo.ResolveMap.get());
 		InitialShapeUPtr Shape(InitialShapeBuilder->createInitialShape());
 		InitialShapePtrs.push_back(Shape.get());
 		InitialShapeUPtrs.push_back(std::move(Shape));
 
+		InitialShapeAttributeMaps.Add(MoveTemp(AttributeMap));
 		InitialShapeBuilders.Add(MoveTemp(InitialShapeBuilder));
 	});
 
@@ -505,7 +512,7 @@ FGenerateResultDescription VitruvioModule::BatchGenerate(TArray<FInitialShape> I
 		}
 		
 		ForeachInitialShape([&EvaluateAttributeMapBuilders, &EvaluatedAttributes]
-			(int32 InitialShapeIndex, const FInitialShape& InitialShape, const FStartRuleInfo& StartRuleInfo)
+			(int32 InitialShapeIndex, const FInitialShapeData&, const FStartRuleInfo& StartRuleInfo)
 		{
 			const FAttributeMapPtr AttributeMap = MakeShared<FAttributeMap>(
 				AttributeMapUPtr(EvaluateAttributeMapBuilders[InitialShapeIndex]->createAttributeMapAndReset()),
@@ -522,7 +529,7 @@ FGenerateResultDescription VitruvioModule::BatchGenerate(TArray<FInitialShape> I
 		InitialShapePtrs.clear();
 
 		ForeachInitialShape([&InitialShapeBuilders, &EvaluatedAttributes, &InitialShapePtrs, &InitialShapeUPtrs]
-			(int32 InitialShapeIndex, const FInitialShape& InitialShape, const FStartRuleInfo& StartRuleInfo)
+			(int32 InitialShapeIndex, const FInitialShapeData& InitialShape, const FStartRuleInfo& StartRuleInfo)
 		{
 			const InitialShapeBuilderUPtr& InitialShapeBuilder = InitialShapeBuilders[InitialShapeIndex];
 			InitialShapeBuilder->setAttributes(*StartRuleInfo.RuleFile, *StartRuleInfo.StartRule, InitialShape.RandomSeed, L"",
@@ -564,35 +571,35 @@ FGenerateResultDescription VitruvioModule::BatchGenerate(TArray<FInitialShape> I
     	GenerateOutputHandler->GetInstanceMeshes(), GenerateOutputHandler->GetInstanceNames(), {}, EvaluatedAttributes };
 }
 
-FAttributeMapsResult VitruvioModule::BatchEvaluateRuleAttributesAsync(TArray<FInitialShape> InitialShapes) const
+FAttributeMapsResult VitruvioModule::BatchEvaluateRuleAttributesAsync(const TArray<FInitialShapeData>& InitialShapes) const
 {
 	FAttributeMapsResult::FTokenPtr InvalidationToken = MakeShared<FEvalAttributesToken>();
 
 	CHECK_PRT_INITIALIZED_ASYNC(FAttributeMapsResult, InvalidationToken)
 
-	FAttributeMapsResult::FFutureType AttributeMapPtrFuture = Async(EAsyncExecution::Thread, [this, InvalidationToken, InitialShapes = MoveTemp(InitialShapes)]() mutable {
-		TArray<FAttributeMapPtr> Result = BatchEvaluateRuleAttributes(MoveTemp(InitialShapes));
+	FAttributeMapsResult::FFutureType AttributeMapPtrFuture = Async(EAsyncExecution::Thread, [this, InvalidationToken, InitialShapes]() mutable {
+		TArray<FAttributeMapPtr> Result = BatchEvaluateRuleAttributes(InitialShapes);
 		return FAttributeMapsResult::ResultType { InvalidationToken, MoveTemp(Result) };
 	});
 
 	return {MoveTemp(AttributeMapPtrFuture), InvalidationToken};
 }
 
-FGenerateResult VitruvioModule::GenerateAsync(FInitialShape InitialShape) const
+FGenerateResult VitruvioModule::GenerateAsync(const FInitialShapeData& InitialShape) const
 {
 	const FGenerateResult::FTokenPtr Token = MakeShared<FGenerateToken>();
 
 	CHECK_PRT_INITIALIZED_ASYNC(FGenerateResult, Token)
 
-	FGenerateResult::FFutureType ResultFuture = Async(EAsyncExecution::Thread, [this, Token, InitialShape = MoveTemp(InitialShape)]() mutable {
-		FGenerateResultDescription Result = Generate(MoveTemp(InitialShape));
+	FGenerateResult::FFutureType ResultFuture = Async(EAsyncExecution::Thread, [this, Token, InitialShape]() mutable {
+		FGenerateResultDescription Result = Generate(InitialShape);
 		return FGenerateResult::ResultType{Token, MoveTemp(Result)};
 	});
 
 	return FGenerateResult{MoveTemp(ResultFuture), Token};
 }
 
-FGenerateResultDescription VitruvioModule::Generate(const FInitialShape& InitialShape) const
+FGenerateResultDescription VitruvioModule::Generate(const FInitialShapeData& InitialShape) const
 {
 	CHECK_PRT_INITIALIZED()
 
@@ -609,8 +616,9 @@ FGenerateResultDescription VitruvioModule::Generate(const FInitialShape& Initial
 	const RuleFileInfoPtr StartRuleInfo = prt_make_shared<const prt::RuleFileInfo>(prt::createRuleFileInfo(RuleFileUri));
 	const std::wstring StartRule = prtu::detectStartRule(StartRuleInfo);
 
+	AttributeMapUPtr AttributeMap = Vitruvio::CreateAttributeMap(InitialShape.Attributes);
 	InitialShapeBuilder->setAttributes(RuleFile.c_str(), StartRule.c_str(),
-		InitialShape.RandomSeed, L"", InitialShape.Attributes.get(), ResolveMap.get());
+		InitialShape.RandomSeed, L"", AttributeMap.get(), ResolveMap.get());
 
 	TArray<AttributeMapBuilderUPtr> AttributeMapBuilders;
 	AttributeMapBuilders.Add(AttributeMapBuilderUPtr(prt::AttributeMapBuilder::create()));
@@ -642,7 +650,7 @@ FGenerateResultDescription VitruvioModule::Generate(const FInitialShape& Initial
 									  OutputHandler->GetInstanceNames(), OutputHandler->GetReports()};
 }
 
-FAttributeMapResult VitruvioModule::EvaluateRuleAttributesAsync(FInitialShape InitialShape) const
+FAttributeMapResult VitruvioModule::EvaluateRuleAttributesAsync(const FInitialShapeData& InitialShape) const
 {
 	FAttributeMapResult::FTokenPtr InvalidationToken = MakeShared<FEvalAttributesToken>();
 
@@ -650,7 +658,7 @@ FAttributeMapResult VitruvioModule::EvaluateRuleAttributesAsync(FInitialShape In
 
 	LoadAttributesCounter.Increment();
 
-	FAttributeMapResult::FFutureType AttributeMapPtrFuture = Async(EAsyncExecution::Thread, [this, InvalidationToken, InitialShape = MoveTemp(InitialShape)]() mutable {
+	FAttributeMapResult::FFutureType AttributeMapPtrFuture = Async(EAsyncExecution::Thread, [this, InvalidationToken, InitialShape]() mutable {
 		const ResolveMapSPtr ResolveMap = LoadResolveMapAsync(InitialShape.RulePackage).Get();
 
 		const std::wstring RuleFile = ResolveMap->findCGBKey();
@@ -687,25 +695,25 @@ FAttributeMapResult VitruvioModule::EvaluateRuleAttributesAsync(FInitialShape In
 	return {MoveTemp(AttributeMapPtrFuture), InvalidationToken};
 }
 
-TArray<FAttributeMapPtr> VitruvioModule::BatchEvaluateRuleAttributes(TArray<FInitialShape> InitialShapes) const
+TArray<FAttributeMapPtr> VitruvioModule::BatchEvaluateRuleAttributes(const TArray<FInitialShapeData>& InitialShapes) const
 {
 	CHECK_PRT_INITIALIZED()
 	
 	LoadAttributesCounter.Add(InitialShapes.Num());
 
-	TMap<URulePackage*, TArray<FInitialShape>> RulePackages;
-	for (FInitialShape& InitialShape : InitialShapes)
+	TMap<URulePackage*, TArray<FInitialShapeData>> RulePackages;
+	for (const FInitialShapeData& InitialShape : InitialShapes)
 	{
-		RulePackages.FindOrAdd(InitialShape.RulePackage).Add(MoveTemp(InitialShape));
+		RulePackages.FindOrAdd(InitialShape.RulePackage).Add(InitialShape);
 	}
 
-	TArray<TTuple<TFuture<ResolveMapSPtr>, TArray<FInitialShape>>> ResolveMapFutures;
+	TArray<TTuple<TFuture<ResolveMapSPtr>, TArray<FInitialShapeData>>> ResolveMapFutures;
 	for (auto& [RulePackage, InitialShapesByRpk] : RulePackages)
 	{
-		ResolveMapFutures.Add(MakeTuple(LoadResolveMapAsync(RulePackage), MoveTemp(InitialShapesByRpk)));
+		ResolveMapFutures.Add(MakeTuple(LoadResolveMapAsync(RulePackage), InitialShapesByRpk));
 	}
 
-	TArray<TTuple<FStartRuleInfo, TArray<FInitialShape>>> RuleInfoInitialShapes;
+	TArray<TTuple<FStartRuleInfo, TArray<FInitialShapeData>>> RuleInfoInitialShapes;
 	for (auto& [ResolveMapFuture, InitialShapesByRpk] : ResolveMapFutures)
 	{
 		const ResolveMapSPtr ResolveMap = ResolveMapFuture.Get();
@@ -718,7 +726,7 @@ TArray<FAttributeMapPtr> VitruvioModule::BatchEvaluateRuleAttributes(TArray<FIni
 		
 		FStartRuleInfo StartRuleInfo { ResolveMap, RuleFile.c_str(), StartRule.c_str(), RuleFileInfo };
 
-		RuleInfoInitialShapes.Add(MakeTuple(StartRuleInfo, MoveTemp(InitialShapesByRpk)));
+		RuleInfoInitialShapes.Add(MakeTuple(StartRuleInfo, InitialShapesByRpk));
 	}
 	
 	auto ForeachInitialShape = [&](auto Fun)
@@ -726,7 +734,7 @@ TArray<FAttributeMapPtr> VitruvioModule::BatchEvaluateRuleAttributes(TArray<FIni
 		int InitialShapeIndex = 0;
 		for (auto& [StartRuleInfo, InitialShapesByRpk] : RuleInfoInitialShapes)
 		{
-			for (const FInitialShape& InitialShape : InitialShapesByRpk)
+			for (const FInitialShapeData& InitialShape : InitialShapesByRpk)
 			{
 				Fun(InitialShapeIndex, InitialShape, StartRuleInfo);
 
@@ -740,12 +748,13 @@ TArray<FAttributeMapPtr> VitruvioModule::BatchEvaluateRuleAttributes(TArray<FIni
 	InitialShapeNOPtrVector InitialShapePtrs;
 
 	ForeachInitialShape([&]
-		(int32 InitialShapeIndex, const FInitialShape& InitialShape, const FStartRuleInfo& StartRuleInfo)
+		(int32 InitialShapeIndex, const FInitialShapeData& InitialShape, const FStartRuleInfo& StartRuleInfo)
 	{
+		AttributeMapUPtr AttributeMap = Vitruvio::CreateAttributeMap(InitialShape.Attributes);
 		InitialShapeBuilderUPtr InitialShapeBuilder(prt::InitialShapeBuilder::create());
 		SetInitialShapeGeometry(InitialShapeBuilder, InitialShape);
 		InitialShapeBuilder->setAttributes(*StartRuleInfo.RuleFile, *StartRuleInfo.StartRule, InitialShape.RandomSeed, L"",
-			InitialShape.Attributes.get(), StartRuleInfo.ResolveMap.get());
+			AttributeMap.get(), StartRuleInfo.ResolveMap.get());
 		InitialShapeUPtr Shape(InitialShapeBuilder->createInitialShape());
 		InitialShapePtrs.push_back(Shape.get());
 		InitialShapeUPtrs.push_back(std::move(Shape));
@@ -784,7 +793,7 @@ TArray<FAttributeMapPtr> VitruvioModule::BatchEvaluateRuleAttributes(TArray<FIni
 		}
 		
 		ForeachInitialShape([&]
-			(int32 InitialShapeIndex, const FInitialShape& InitialShape, const FStartRuleInfo& StartRuleInfo)
+			(int32 InitialShapeIndex, const FInitialShapeData& InitialShape, const FStartRuleInfo& StartRuleInfo)
 		{
 			const FAttributeMapPtr AttributeMap = MakeShared<FAttributeMap>(
 				AttributeMapUPtr(EvaluateAttributeMapBuilders[InitialShapeIndex]->createAttributeMapAndReset()),
