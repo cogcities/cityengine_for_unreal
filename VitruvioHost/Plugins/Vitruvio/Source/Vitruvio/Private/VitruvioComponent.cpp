@@ -55,7 +55,7 @@ bool ToBool(const FString& Value)
 }
 
 template <typename T>
-void SetInitialShape(UVitruvioComponent* Component, bool bGenerateModel, UGenerateCompletedCallbackProxy* CallbackProxy, T&& InitialShapeInitializer)
+void SetInitialShape(UVitruvioComponent* Component, bool bEvaluateAttributes, bool bGenerateModel, UGenerateCompletedCallbackProxy* CallbackProxy, T&& InitialShapeInitializer)
 {
 	if (Component->InitialShape)
 	{
@@ -67,8 +67,14 @@ void SetInitialShape(UVitruvioComponent* Component, bool bGenerateModel, UGenera
 
 	Component->InitialShape = NewInitialShape;
 
+	NewInitialShape->UpdatePolygon(Component);
+
 	Component->RemoveGeneratedMeshes();
-	Component->EvaluateRuleAttributes(bGenerateModel, CallbackProxy);
+
+	if (bEvaluateAttributes || bGenerateModel)
+	{
+		Component->EvaluateRuleAttributes(bGenerateModel, CallbackProxy);
+	}
 }
 
 FVector GetCentroid(const TArray<FVector>& Vertices)
@@ -141,105 +147,54 @@ void SetAttribute(UVitruvioComponent* VitruvioComponent, const TMap<FString, URu
 
 	TAttribute->bUserSet = true;
 
-	if (bEvaluateAttributes || bGenerateModel)
+	if (bEvaluateAttributes)
 	{
 		VitruvioComponent->EvaluateRuleAttributes(bGenerateModel, CallbackProxy);
 	}
 }
 
-template <typename A, typename T>
-void EvaluateAndSetAttribute(UVitruvioComponent* VitruvioComponent, TMap<FString, URuleAttribute*>& Attributes, const FString& Name, const T& Value,
-							 bool bGenerateModel, UGenerateCompletedCallbackProxy* CallbackProxy)
+template <typename TAttributeType, typename TValueType>
+requires std::is_base_of_v<URuleAttribute, TAttributeType>
+void SetAttribute(UVitruvioComponent* VitruvioComponent, TMap<FString, URuleAttribute*>& Attributes, const FString& Name, const TValueType& Value,
+							 bool bEvaluateAttributes, bool bGenerateModel, UGenerateCompletedCallbackProxy* CallbackProxy)
 {
 	VitruvioComponent->Initialize();
 
-	if (!VitruvioComponent->GetAttributesReady())
+	URuleAttribute* Attribute;
+		
+	if (URuleAttribute** AttributeResult = Attributes.Find(Name))
 	{
-		UGenerateCompletedCallbackProxy* Proxy = NewObject<UGenerateCompletedCallbackProxy>();
-		Proxy->OnAttributesEvaluated.AddLambda(
-			[=, &Attributes]() { SetAttribute<A, T>(VitruvioComponent, Attributes, Name, Value, true, bGenerateModel, CallbackProxy); });
-		Proxy->RegisterWithGameInstance(VitruvioComponent);
-		VitruvioComponent->EvaluateRuleAttributes(bGenerateModel, Proxy);
+		Attribute = *AttributeResult;
 	}
 	else
 	{
-		SetAttribute<A, T>(VitruvioComponent, Attributes, Name, Value, true, bGenerateModel, CallbackProxy);
+		Attribute = NewObject<TAttributeType>(VitruvioComponent);
+		Attribute->SetFlags(RF_Transactional);
+		Attribute->Name = Name;
+		Attribute->DisplayName = WCHAR_TO_TCHAR(prtu::removeImport(prtu::removeStyle(*Name)).c_str());
+
+		Attributes.Add(Name, Attribute);
 	}
-}
 
-void EvaluateAndSetAttributes(UVitruvioComponent* VitruvioComponent, const TMap<FString, FString>& NewAttributes, bool bGenerateModel,
-							  UGenerateCompletedCallbackProxy* CallbackProxy)
-{
-	VitruvioComponent->Initialize();
-
-	if (!VitruvioComponent->GetAttributesReady())
+	TAttributeType* TAttribute = Cast<TAttributeType>(Attribute);
+	if (!TAttribute)
 	{
-		UGenerateCompletedCallbackProxy* Proxy = NewObject<UGenerateCompletedCallbackProxy>();
-		Proxy->OnAttributesEvaluated.AddLambda([=]() { EvaluateAndSetAttributes(VitruvioComponent, NewAttributes, bGenerateModel, CallbackProxy); });
-		Proxy->RegisterWithGameInstance(VitruvioComponent);
-		VitruvioComponent->EvaluateRuleAttributes(bGenerateModel, Proxy);
+		return;
+	}
+
+	if constexpr (TIsTArray<TValueType>::Value)
+	{
+		TAttribute->Values = Value;
 	}
 	else
 	{
-		for (const auto& KeyValues : NewAttributes)
-		{
-			const FString& Value = KeyValues.Value;
-			const FString& Key = KeyValues.Key;
+		TAttribute->Value = Value;
+	}
 
-			URuleAttribute* const* AttributeResult = VitruvioComponent->GetAttributes().Find(Key);
-			if (!AttributeResult)
-			{
-				continue;
-			}
+	TAttribute->bUserSet = true;
 
-			URuleAttribute const* Attribute = *AttributeResult;
-
-			if (Cast<UFloatAttribute>(Attribute))
-			{
-				SetAttribute<UFloatAttribute, double>(VitruvioComponent, VitruvioComponent->GetAttributes(), Key, FCString::Atof(*Value), false,
-													  false, nullptr);
-			}
-			else if (Cast<UBoolAttribute>(Attribute))
-			{
-				SetAttribute<UBoolAttribute, bool>(VitruvioComponent, VitruvioComponent->GetAttributes(), Key, ToBool(Value), false, false, nullptr);
-			}
-			else if (Cast<UStringAttribute>(Attribute))
-			{
-				SetAttribute<UStringAttribute, FString>(VitruvioComponent, VitruvioComponent->GetAttributes(), Key, Value, false, false, nullptr);
-			}
-			else if (Cast<UArrayAttribute>(Attribute))
-			{
-				FString ArrayValue = Value;
-				if (Value.StartsWith(TEXT("[")) && Value.EndsWith(TEXT("]")))
-				{
-					ArrayValue = Value.LeftChop(1).RightChop(1);
-				}
-
-				TArray<FString> StringValues;
-				ArrayValue.ParseIntoArray(StringValues, TEXT(","));
-
-				if (Cast<UFloatArrayAttribute>(Attribute))
-				{
-					TArray<double> DoubleValues;
-					Algo::Transform(StringValues, DoubleValues, [](const auto& In) { return FCString::Atof(*In); });
-					SetAttribute<UFloatArrayAttribute, TArray<double>>(VitruvioComponent, VitruvioComponent->GetAttributes(), Key, DoubleValues,
-																	   false, false, nullptr);
-				}
-				else if (Cast<UBoolArrayAttribute>(Attribute))
-				{
-					TArray<bool> BoolValues;
-					Algo::Transform(StringValues, BoolValues, [](const auto& In) { return ToBool(In); });
-					SetAttribute<UBoolArrayAttribute, TArray<bool>>(VitruvioComponent, VitruvioComponent->GetAttributes(), Key, BoolValues, false,
-																	false, nullptr);
-				}
-				else
-				{
-					SetAttribute<UStringArrayAttribute, TArray<FString>>(VitruvioComponent, VitruvioComponent->GetAttributes(), Key, StringValues,
-																		 false, false, nullptr);
-				}
-			}
-		}
-
+	if (bEvaluateAttributes || bGenerateModel)
+	{
 		VitruvioComponent->EvaluateRuleAttributes(bGenerateModel, CallbackProxy);
 	}
 }
@@ -512,17 +467,17 @@ bool UVitruvioComponent::HasValidInputData() const
 
 bool UVitruvioComponent::IsReadyToGenerate() const
 {
-	return (HasValidInputData() && bAttributesReady) || bBatchGenerate;
+	return HasValidInputData() && bAttributesReady;
 }
 
 void UVitruvioComponent::SetRpk(URulePackage* RulePackage, bool bEvaluateAttributes, bool bGenerateModel, UGenerateCompletedCallbackProxy* CallbackProxy)
 {
-	if (this->Rpk == RulePackage)
+	if (Rpk == RulePackage)
 	{
 		return;
 	}
 
-	this->Rpk = RulePackage;
+	Rpk = RulePackage;
 
 	Attributes.Empty();
 	bAttributesReady = false;
@@ -536,7 +491,7 @@ void UVitruvioComponent::SetRpk(URulePackage* RulePackage, bool bEvaluateAttribu
 	}
 }
 
-void UVitruvioComponent::SetBatchGenerated(bool bBatchGeneration)
+void UVitruvioComponent::SetBatchGenerated(bool bBatchGeneration, bool bGenerateModel)
 {
 	if (GenerateToken)
 	{
@@ -550,12 +505,16 @@ void UVitruvioComponent::SetBatchGenerated(bool bBatchGeneration)
 	if (bBatchGenerate)
 	{
 		RemoveGeneratedMeshes();
-		VitruvioSubsystem->RegisterVitruvioComponent(this);
+		VitruvioSubsystem->RegisterVitruvioComponent(this, bGenerateModel);
 	}
 	else
 	{
 		VitruvioSubsystem->UnregisterVitruvioComponent(this);
-		EvaluateRuleAttributes(true, nullptr);
+
+		if (bGenerateModel)
+		{
+			EvaluateRuleAttributes(true, nullptr);
+		}
 	}
 }
 
@@ -576,79 +535,145 @@ void UVitruvioComponent::SetInstanceReplacementAsset(UInstanceReplacementAsset* 
 	Generate();
 }
 
-void UVitruvioComponent::SetStringAttribute(const FString& Name, const FString& Value, bool bGenerateModel,
+void UVitruvioComponent::SetStringAttribute(const FString& Name, const FString& Value, bool bEvaluateAttributes, bool bGenerateModel,
 											UGenerateCompletedCallbackProxy* CallbackProxy)
 {
-	EvaluateAndSetAttribute<UStringAttribute, FString>(this, this->Attributes, Name, Value, bGenerateModel, CallbackProxy);
+	SetAttribute<UStringAttribute, FString>(this, Attributes, Name, Value, bEvaluateAttributes, bGenerateModel, CallbackProxy);
 }
 
 bool UVitruvioComponent::GetStringAttribute(const FString& Name, FString& OutValue) const
 {
-	return GetAttribute<UStringAttribute, FString>(this->Attributes, Name, OutValue);
+	return GetAttribute<UStringAttribute, FString>(Attributes, Name, OutValue);
 }
 
-void UVitruvioComponent::SetStringArrayAttribute(const FString& Name, const TArray<FString>& Values, bool bGenerateModel,
+void UVitruvioComponent::SetStringArrayAttribute(const FString& Name, const TArray<FString>& Values, bool bEvaluateAttributes, bool bGenerateModel,
 												 UGenerateCompletedCallbackProxy* CallbackProxy)
 {
-	EvaluateAndSetAttribute<UStringArrayAttribute, TArray<FString>>(this, this->Attributes, Name, Values, bGenerateModel, CallbackProxy);
+	SetAttribute<UStringArrayAttribute, TArray<FString>>(this, Attributes, Name, Values, bEvaluateAttributes, bGenerateModel, CallbackProxy);
 }
 
 bool UVitruvioComponent::GetStringArrayAttribute(const FString& Name, TArray<FString>& OutValue) const
 {
-	return GetAttribute<UStringArrayAttribute, TArray<FString>>(this->Attributes, Name, OutValue);
+	return GetAttribute<UStringArrayAttribute, TArray<FString>>(Attributes, Name, OutValue);
 }
 
-void UVitruvioComponent::SetBoolAttribute(const FString& Name, bool Value, bool bGenerateModel, UGenerateCompletedCallbackProxy* CallbackProxy)
+void UVitruvioComponent::SetBoolAttribute(const FString& Name, bool Value, bool bEvaluateAttributes, bool bGenerateModel, UGenerateCompletedCallbackProxy* CallbackProxy)
 {
-	EvaluateAndSetAttribute<UBoolAttribute, bool>(this, this->Attributes, Name, Value, bGenerateModel, CallbackProxy);
+	SetAttribute<UBoolAttribute, bool>(this, Attributes, Name, Value, bEvaluateAttributes, bGenerateModel, CallbackProxy);
 }
 
 bool UVitruvioComponent::GetBoolAttribute(const FString& Name, bool& OutValue) const
 {
-	return GetAttribute<UBoolAttribute, bool>(this->Attributes, Name, OutValue);
+	return GetAttribute<UBoolAttribute, bool>(Attributes, Name, OutValue);
 }
 
-void UVitruvioComponent::SetBoolArrayAttribute(const FString& Name, const TArray<bool>& Values, bool bGenerateModel,
+void UVitruvioComponent::SetBoolArrayAttribute(const FString& Name, const TArray<bool>& Values, bool bEvaluateAttributes, bool bGenerateModel,
 											   UGenerateCompletedCallbackProxy* CallbackProxy)
 {
-	EvaluateAndSetAttribute<UBoolArrayAttribute, TArray<bool>>(this, this->Attributes, Name, Values, bGenerateModel, CallbackProxy);
+	SetAttribute<UBoolArrayAttribute, TArray<bool>>(this, Attributes, Name, Values, bEvaluateAttributes, bGenerateModel, CallbackProxy);
 }
 
 bool UVitruvioComponent::GetBoolArrayAttribute(const FString& Name, TArray<bool>& OutValue) const
 {
-	return GetAttribute<UBoolArrayAttribute, TArray<bool>>(this->Attributes, Name, OutValue);
+	return GetAttribute<UBoolArrayAttribute, TArray<bool>>(Attributes, Name, OutValue);
 }
 
-void UVitruvioComponent::SetFloatAttribute(const FString& Name, double Value, bool bGenerateModel, UGenerateCompletedCallbackProxy* CallbackProxy)
+void UVitruvioComponent::SetFloatAttribute(const FString& Name, double Value, bool bEvaluateAttributes, bool bGenerateModel, UGenerateCompletedCallbackProxy* CallbackProxy)
 {
-	EvaluateAndSetAttribute<UFloatAttribute, double>(this, this->Attributes, Name, Value, bGenerateModel, CallbackProxy);
+	SetAttribute<UFloatAttribute, double>(this, Attributes, Name, Value, bEvaluateAttributes, bGenerateModel, CallbackProxy);
 }
 
 bool UVitruvioComponent::GetFloatAttribute(const FString& Name, double& OutValue) const
 {
-	return GetAttribute<UFloatAttribute, double>(this->Attributes, Name, OutValue);
+	return GetAttribute<UFloatAttribute, double>(Attributes, Name, OutValue);
 }
 
-void UVitruvioComponent::SetFloatArrayAttribute(const FString& Name, const TArray<double>& Values, bool bGenerateModel,
+void UVitruvioComponent::SetFloatArrayAttribute(const FString& Name, const TArray<double>& Values, bool bEvaluateAttributes, bool bGenerateModel,
 												UGenerateCompletedCallbackProxy* CallbackProxy)
 {
-	EvaluateAndSetAttribute<UFloatArrayAttribute, TArray<double>>(this, this->Attributes, Name, Values, bGenerateModel, CallbackProxy);
+	SetAttribute<UFloatArrayAttribute, TArray<double>>(this, Attributes, Name, Values, bEvaluateAttributes, bGenerateModel, CallbackProxy);
 }
 
 bool UVitruvioComponent::GetFloatArrayAttribute(const FString& Name, TArray<double>& OutValue) const
 {
-	return GetAttribute<UFloatArrayAttribute, TArray<double>>(this->Attributes, Name, OutValue);
+	return GetAttribute<UFloatArrayAttribute, TArray<double>>(Attributes, Name, OutValue);
 }
 
-void UVitruvioComponent::SetAttributes(const TMap<FString, FString>& NewAttributes, bool bGenerateModel,
-									   UGenerateCompletedCallbackProxy* CallbackProxy)
+void UVitruvioComponent::SetAttributes(const TMap<FString, FString>& NewAttributes, bool bEvaluateAttributes, bool bGenerateModel, UGenerateCompletedCallbackProxy* CallbackProxy)
 {
-	EvaluateAndSetAttributes(this, NewAttributes, bGenerateModel, CallbackProxy);
+	Initialize();
+	for (const auto& KeyValues : NewAttributes)
+	{
+		const FString& Value = KeyValues.Value;
+		const FString& Key = KeyValues.Key;
+
+		URuleAttribute* Attribute;
+		
+		if (URuleAttribute* const* AttributeResult = GetAttributes().Find(Key))
+		{
+			Attribute = *AttributeResult;
+		}
+		else
+		{
+			Attribute = Vitruvio::CreateAttribute(Key, Value);
+			Attributes.Add(Key, Attribute);
+		}
+
+		if (Cast<UFloatAttribute>(Attribute))
+		{
+			SetAttribute<UFloatAttribute, double>(this, GetAttributes(), Key, FCString::Atof(*Value), false,
+			                                      false, nullptr);
+		}
+		else if (Cast<UBoolAttribute>(Attribute))
+		{
+			SetAttribute<UBoolAttribute, bool>(this, GetAttributes(), Key, ToBool(Value), false, false, nullptr);
+		}
+		else if (Cast<UStringAttribute>(Attribute))
+		{
+			SetAttribute<UStringAttribute, FString>(this, GetAttributes(), Key, Value, false, false, nullptr);
+		}
+		else if (Cast<UArrayAttribute>(Attribute))
+		{
+			FString ArrayValue = Value;
+			if (Value.StartsWith(TEXT("[")) && Value.EndsWith(TEXT("]")))
+			{
+				ArrayValue = Value.LeftChop(1).RightChop(1);
+			}
+
+			TArray<FString> StringValues;
+			ArrayValue.ParseIntoArray(StringValues, TEXT(","));
+
+			if (Cast<UFloatArrayAttribute>(Attribute))
+			{
+				TArray<double> DoubleValues;
+				Algo::Transform(StringValues, DoubleValues, [](const auto& In) { return FCString::Atof(*In); });
+				SetAttribute<UFloatArrayAttribute, TArray<double>>(this, GetAttributes(), Key, DoubleValues,
+				                                                   false, false, nullptr);
+			}
+			else if (Cast<UBoolArrayAttribute>(Attribute))
+			{
+				TArray<bool> BoolValues;
+				Algo::Transform(StringValues, BoolValues, [](const auto& In) { return ToBool(In); });
+				SetAttribute<UBoolArrayAttribute, TArray<bool>>(this, GetAttributes(), Key, BoolValues, false,
+				                                                false, nullptr);
+			}
+			else
+			{
+				SetAttribute<UStringArrayAttribute, TArray<FString>>(this, GetAttributes(), Key, StringValues,
+				                                                     false, false, nullptr);
+			}
+		}
+	}
+
+	if (bEvaluateAttributes || bGenerateModel)
+	{
+		EvaluateRuleAttributes(bGenerateModel, CallbackProxy);
+	}
 }
 
-void UVitruvioComponent::SetMeshInitialShape(UStaticMesh* StaticMesh, bool bGenerateModel, UGenerateCompletedCallbackProxy* CallbackProxy)
+void UVitruvioComponent::SetMeshInitialShape(UStaticMesh* StaticMesh, bool bEvaluateAttributes, bool bGenerateModel, UGenerateCompletedCallbackProxy* CallbackProxy)
 {
-	SetInitialShape(this, bGenerateModel, CallbackProxy, [this, StaticMesh]() {
+	SetInitialShape(this, bEvaluateAttributes, bGenerateModel, CallbackProxy, [this, StaticMesh]() {
 		UStaticMeshInitialShape* NewInitialShape =
 			NewObject<UStaticMeshInitialShape>(GetOwner(), UStaticMeshInitialShape::StaticClass(), NAME_None, RF_Transactional);
 		InitialShapeSceneComponent = NewInitialShape->CreateInitialShapeComponent(this, StaticMesh);
@@ -656,13 +681,24 @@ void UVitruvioComponent::SetMeshInitialShape(UStaticMesh* StaticMesh, bool bGene
 	});
 }
 
-void UVitruvioComponent::SetSplineInitialShape(const TArray<FSplinePoint>& SplinePoints, bool bGenerateModel,
+void UVitruvioComponent::SetSplineInitialShape(const TArray<FSplinePoint>& SplinePoints, bool bEvaluateAttributes, bool bGenerateModel,
 											   UGenerateCompletedCallbackProxy* CallbackProxy)
 {
-	SetInitialShape(this, bGenerateModel, CallbackProxy, [this, &SplinePoints]() {
+	SetInitialShape(this, bEvaluateAttributes, bGenerateModel, CallbackProxy, [this, &SplinePoints]() {
 		USplineInitialShape* NewInitialShape =
 			NewObject<USplineInitialShape>(GetOwner(), USplineInitialShape::StaticClass(), NAME_None, RF_Transactional);
 		InitialShapeSceneComponent = NewInitialShape->CreateInitialShapeComponent(this, SplinePoints);
+		return NewInitialShape;
+	});
+}
+
+void UVitruvioComponent::SetPolygonInitialShape(const FInitialShapePolygon& InitialShapePolygon, bool bEvaluateAttributes, bool bGenerateModel,
+	UGenerateCompletedCallbackProxy* CallbackProxy)
+{
+	SetInitialShape(this, bEvaluateAttributes, bGenerateModel, CallbackProxy, [this, InitialShapePolygon]() {
+		UPolygonInitialShape* NewInitialShape =
+			NewObject<UPolygonInitialShape>(GetOwner(), UPolygonInitialShape::StaticClass(), NAME_None, RF_Transactional);
+		InitialShapeSceneComponent = NewInitialShape->CreateInitialShapeComponent(this, InitialShapePolygon);
 		return NewInitialShape;
 	});
 }
@@ -688,12 +724,15 @@ void UVitruvioComponent::SetInitialShapeVisible(bool bVisible)
 	InitialShapeSceneComponent->SetHiddenInGame(!bVisible);
 }
 
-void UVitruvioComponent::SetRandomSeed(int32 NewRandomSeed, bool bGenerateModel, UGenerateCompletedCallbackProxy* CallbackProxy)
+void UVitruvioComponent::SetRandomSeed(int32 NewRandomSeed, bool bEvaluateAttributes, bool bGenerateModel, UGenerateCompletedCallbackProxy* CallbackProxy)
 {
 	RandomSeed = NewRandomSeed;
 	bValidRandomSeed = true;
 
-	EvaluateRuleAttributes(bGenerateModel, CallbackProxy);
+	if (bEvaluateAttributes || bGenerateModel)
+	{
+		EvaluateRuleAttributes(bGenerateModel, CallbackProxy);
+	}
 }
 
 int32 UVitruvioComponent::GetRandomSeed()
@@ -709,7 +748,7 @@ void UVitruvioComponent::LoadInitialShape()
 		return;
 	}
 
-	// Detect initial initial shape type (eg if there has already been a StaticMeshComponent assigned to the actor)
+	// Detect initial initial-shape type (e.g. if there has already been a StaticMeshComponent assigned to the actor)
 	check(GetInitialShapesClasses().Num() > 0);
 	for (const auto& InitialShapeClasses : GetInitialShapesClasses())
 	{
@@ -989,11 +1028,6 @@ void UVitruvioComponent::RemoveGeneratedMeshes()
 
 	bHasGeneratedModel = false;
 	SetInitialShapeVisible(true);
-
-	if (bBatchGenerate)
-	{
-		Generate();
-	}
 }
 
 bool UVitruvioComponent::GetAttributesReady() const
@@ -1099,7 +1133,6 @@ void UVitruvioComponent::Generate(UGenerateCompletedCallbackProxy* CallbackProxy
 		return;
 	}
 
-	// If either the RPK, initial shape or attributes are not ready we can not generate
 	if (!HasValidInputData())
 	{
 		RemoveGeneratedMeshes();
@@ -1301,19 +1334,32 @@ void UVitruvioComponent::SetInitialShapeType(const TSubclassOf<UInitialShape>& T
 void UVitruvioComponent::EvaluateRuleAttributes(bool ForceRegenerate, UGenerateCompletedCallbackProxy* CallbackProxy)
 {
 	Initialize();
-
-	// If we don't have valid input data (initial shape and rpk) we can not evaluate the rule attribtues
-	if (!HasValidInputData())
-	{
-		return;
-	}
-
-	// Since we can not abort an ongoing generate call from PRT, we invalidate the result and evaluate the attributes again after the current request
-	// has completed.
+	
 	if (EvalAttributesInvalidationToken)
 	{
 		EvalAttributesInvalidationToken->Invalidate();
 		EvalAttributesInvalidationToken.Reset();
+	}
+	
+	if (bBatchGenerate)
+	{
+		UVitruvioBatchSubsystem* BatchGenerateSubsystem = GetWorld()->GetSubsystem<UVitruvioBatchSubsystem>();
+
+		if (ForceRegenerate)
+		{
+			BatchGenerateSubsystem->Generate(this, CallbackProxy);
+		}
+		else
+		{
+			BatchGenerateSubsystem->EvaluateAttributes(this, CallbackProxy);
+		}
+
+		return;
+	}
+
+	if (!HasValidInputData())
+	{
+		return;
 	}
 
 	bAttributesReady = false;

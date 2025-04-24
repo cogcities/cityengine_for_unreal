@@ -170,7 +170,7 @@ public:
 	 * Enables or disables batch generation.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Vitruvio")
-	void SetBatchGenerated(bool bBatchGeneration);
+	void SetBatchGenerated(bool bBatchGeneration, bool bGenerateModel = true);
 
 	/**
 	 * Returns whether batch generation is enabled.
@@ -210,14 +210,15 @@ public:
 	bool IsReadyToGenerate() const;
 
 	/**
-	 * Sets the string attribute with the given Name to the given value. Regenerates the model if GenerateAutomatically is set to true.
+	 * Sets the string attribute with the given Name to the given value. Regenerates the model if bGenerateModel is set to true.
 	 *
 	 * @param Name The name of the attribute to set.
 	 * @param Value The new value for the attribute.
+	 * @param bEvaluateAttributes Whether the attributes should be re-evaluated after the initial shape has been set.
 	 * @param bGenerateModel Whether a model should be generated after the attribute has been set.
 	 * @param CallbackProxy The callback proxy used to register for completion events.
 	 */
-	void SetStringAttribute(const FString& Name, const FString& Value, bool bGenerateModel = true,
+	void SetStringAttribute(const FString& Name, const FString& Value, bool bEvaluateAttributes = true, bool bGenerateModel = true,
 							UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
 
 	/**
@@ -235,11 +236,12 @@ public:
 	 *
 	 * @param Name The name of the attribute.
 	 * @param Values The new values for the attribute.
+	 * @param bEvaluateAttributes Whether the attributes should be re-evaluated after the initial shape has been set.
 	 * @param bGenerateModel Whether a model should be generated after the attribute has been set.
 	 * @param CallbackProxy The optional callback proxy used for generate completed notifications.
 	 * @returns true if the attribute has been set to the new value or false otherwise.
 	 */
-	void SetStringArrayAttribute(const FString& Name, const TArray<FString>& Values, bool bGenerateModel = true,
+	void SetStringArrayAttribute(const FString& Name, const TArray<FString>& Values, bool bEvaluateAttributes = true, bool bGenerateModel = true,
 								 UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
 
 	/**
@@ -257,11 +259,12 @@ public:
 	 *
 	 * @param Name The name of the attribute.
 	 * @param Value The new value for the attribute.
+	 * @param bEvaluateAttributes Whether the attributes should be re-evaluated after the initial shape has been set.
 	 * @param bGenerateModel Whether a model should be generated after the attribute has been set.
 	 * @param CallbackProxy The optional callback proxy used for generate completed notifications.
 	 * @returns true if the attribute has been set to the new value or false otherwise.
 	 */
-	void SetBoolAttribute(const FString& Name, bool Value, bool bGenerateModel = true, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
+	void SetBoolAttribute(const FString& Name, bool Value, bool bEvaluateAttributes = true, bool bGenerateModel = true, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
 
 	/**
 	 * Access the bool attribute with the given Name. The OutValue is default initialized if no attribute with the given Name is found.
@@ -278,11 +281,12 @@ public:
 	 *
 	 * @param Name The name of the attribute.
 	 * @param Values The new values for the attribute.
+	 * @param bEvaluateAttributes Whether the attributes should be re-evaluated after the initial shape has been set.
 	 * @param bGenerateModel Whether a model should be generated after the attribute has been set.
 	 * @param CallbackProxy The optional callback proxy used for generate completed notifications.
 	 * @returns true if the attribute has been set to the new value or false otherwise.
 	 */
-	void SetBoolArrayAttribute(const FString& Name, const TArray<bool>& Values, bool bGenerateModel = true,
+	void SetBoolArrayAttribute(const FString& Name, const TArray<bool>& Values, bool bEvaluateAttributes = true, bool bGenerateModel = true,
 							   UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
 
 	/**
@@ -299,12 +303,13 @@ public:
 	 * Sets the float attribute with the given Name to the given value. Regenerates the model if bGenerateModel is set to true.
 	 *
 	 * @param Name The name of the attribute.
+	 * @param bEvaluateAttributes Whether the attributes should be re-evaluated after the initial shape has been set.
 	 * @param Value The new value for the attribute.
 	 * @param bGenerateModel Whether a model should be generated after the attribute has been set.
 	 * @param CallbackProxy The optional callback proxy used for generate completed notifications.
 	 * @returns true if the attribute has been set to the new value or false otherwise.
 	 */
-	void SetFloatAttribute(const FString& Name, double Value, bool bGenerateModel = true, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
+	void SetFloatAttribute(const FString& Name, double Value, bool bEvaluateAttributes = true, bool bGenerateModel = true, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
 
 	/**
 	 * Access the float attribute with the given Name. The OutValue is default initialized if no attribute with the given Name is found.
@@ -320,12 +325,13 @@ public:
 	 * Sets the float array attribute with the given Name to the given value. Regenerates the model if bGenerateModel is set to true.
 	 *
 	 * @param Name The name of the attribute.
+	 * @param bEvaluateAttributes Whether the attributes should be re-evaluated after the initial shape has been set.
 	 * @param Values The new values for the attribute.
 	 * @param bGenerateModel Whether a model should be generated after the attribute has been set.
 	 * @param CallbackProxy The optional callback proxy used for generate completed notifications.
 	 * @returns true if the attribute has been set to the new value or false otherwise.
 	 */
-	void SetFloatArrayAttribute(const FString& Name, const TArray<double>& Values, bool bGenerateModel = true,
+	void SetFloatArrayAttribute(const FString& Name, const TArray<double>& Values, bool bEvaluateAttributes = true, bool bGenerateModel = true,
 								UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
 
 	/**
@@ -345,30 +351,42 @@ public:
 	 * array values are separated via a comma eg: "1.3,4.5,0" for a float array with the values 1.3, 4.5 and 0.
 	 *
 	 * @param NewAttributes The attributes to be set.
+	 * @param bEvaluateAttributes Whether the attributes should be re-evaluated after the initial shape has been set.
 	 * @param bGenerateModel Whether a model should be generated after the attribute has been set.
 	 * @param CallbackProxy The optional callback proxy used for generate completed notifications.
 	 */
-	void SetAttributes(const TMap<FString, FString>& NewAttributes, bool bGenerateModel = true,
+	void SetAttributes(const TMap<FString, FString>& NewAttributes, bool bEvaluateAttributes = true, bool bGenerateModel = true,
 					   UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
 
 	/**
 	 * Sets the given static mesh as initial shape. Regenerates the model if bGenerateModel is set to true.
 	 *
 	 * @param StaticMesh the new initial shape static mesh.
+	 * @param bEvaluateAttributes Whether the attributes should be re-evaluated after the initial shape has been set.
 	 * @param bGenerateModel Whether a model should be generated after the attribute has been set.
 	 * @param CallbackProxy The optional callback proxy used for generate completed notifications.
 	 */
-	void SetMeshInitialShape(UStaticMesh* StaticMesh, bool bGenerateModel = true, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
+	void SetMeshInitialShape(UStaticMesh* StaticMesh, bool bEvaluateAttributes = true, bool bGenerateModel = true, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
 
 	/**
 	 * Sets the given spline points as initial shape. Regenerates the model if bGenerateModel is set to true.
 	 *
 	 * @param SplinePoints the new initial shape spline points.
+	 * @param bEvaluateAttributes Whether the attributes should be re-evaluated after the initial shape has been set.
 	 * @param bGenerateModel Whether a model should be generated after the attribute has been set.
 	 * @param CallbackProxy The optional callback proxy used for generate completed notifications.
 	 */
-	void SetSplineInitialShape(const TArray<FSplinePoint>& SplinePoints, bool bGenerateModel = true,
-							   UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
+	void SetSplineInitialShape(const TArray<FSplinePoint>& SplinePoints, bool bEvaluateAttributes = true, bool bGenerateModel = true, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
+
+	/**
+	 * Sets the given static mesh as initial shape. Regenerates the model if bGenerateModel is set to true.
+	 *
+	 * @param InitialShapePolygon the new initial shape polygon.
+	 * @param bEvaluateAttributes Whether the attributes should be re-evaluated after the initial shape has been set.
+	 * @param bGenerateModel Whether a model should be generated after the attribute has been set.
+	 * @param CallbackProxy The optional callback proxy used for generate completed notifications.
+	 */
+	void SetPolygonInitialShape(const FInitialShapePolygon& InitialShapePolygon, bool bEvaluateAttributes = true, bool bGenerateModel = true, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
 
 	/** Returns the attributes used for generation. */
 	UFUNCTION(BlueprintCallable, Category = "Vitruvio")
@@ -389,7 +407,7 @@ public:
 	/**
 	 * Sets the random seed used for generation. This will reevaluate the attributes and if bGenerateModel is set to true, also generates the model.
 	 */
-	void SetRandomSeed(int32 NewRandomSeed, bool bGenerateModel = true, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
+	void SetRandomSeed(int32 NewRandomSeed, bool bEvaluateAttributes = true, bool bGenerateModel = true, UGenerateCompletedCallbackProxy* CallbackProxy = nullptr);
 
 	UFUNCTION(BlueprintCallable, Category = "Vitruvio")
 	/** Returns the random seed used for generation. */

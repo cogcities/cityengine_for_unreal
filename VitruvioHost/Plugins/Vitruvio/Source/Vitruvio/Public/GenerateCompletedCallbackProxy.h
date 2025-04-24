@@ -71,17 +71,16 @@ public:
 	 * Sets the given Rule Package. This will reevaluate the attributes and if bGenerateModel is set to true, also generates the model.
 	 */
 	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = true), Category = "Vitruvio")
-	static UGenerateCompletedCallbackProxy* SetRpk(UVitruvioComponent* VitruvioComponent, URulePackage* RulePackage, bool bGenerateModel = true);
+	static UGenerateCompletedCallbackProxy* SetRpk(UVitruvioComponent* VitruvioComponent, URulePackage* RulePackage, bool bEvaluateAttributes, bool bGenerateModel = true);
 
 	/**
 	 * Sets the random seed used for generation. This will reevaluate the attributes and if bGenerateModel is set to true, also generates the model.
 	 */
 	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = true), Category = "Vitruvio")
-	static UGenerateCompletedCallbackProxy* SetRandomSeed(UVitruvioComponent* VitruvioComponent, int32 NewRandomSeed, bool bGenerateModel = true);
+	static UGenerateCompletedCallbackProxy* SetRandomSeed(UVitruvioComponent* VitruvioComponent, int32 NewRandomSeed, bool bEvaluateAttributes, bool bGenerateModel = true);
 
 	/**
-	 * Generates a model using the current Rule Package and initial shape. If the attributes are not yet available, they will first be evaluated. If
-	 * no Initial Shape or Rule Package is set, this method will do nothing.
+	 * Generates a model using the current Rule Package and initial shape. If no Initial Shape or Rule Package is set, this method will do nothing.
 	 */
 	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = true), Category = "Vitruvio")
 	static UGenerateCompletedCallbackProxy* Generate(UVitruvioComponent* VitruvioComponent, FGenerateOptions GenerateOptions);
@@ -97,7 +96,7 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = true), Category = "Vitruvio")
 	static UGenerateCompletedCallbackProxy* SetFloatAttribute(UVitruvioComponent* VitruvioComponent, const FString& Name, float Value,
-															  bool bGenerateModel = true);
+															  bool bEvaluateAttributes, bool bGenerateModel = true);
 
 	/**
 	 * Sets the string attribute with the given Name to the given value. Regenerates the model if bGenerateModel is set to true.
@@ -110,7 +109,7 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = true), Category = "Vitruvio")
 	static UGenerateCompletedCallbackProxy* SetStringAttribute(UVitruvioComponent* VitruvioComponent, const FString& Name, const FString& Value,
-															   bool bGenerateModel = true);
+															   bool bEvaluateAttributes, bool bGenerateModel = true);
 
 	/**
 	 * Sets the bool attribute with the given Name to the given value. Regenerates the model if bGenerateModel is set to true.
@@ -118,12 +117,13 @@ public:
 	 * @param VitruvioComponent The VitruvioComponent where the attribute is set
 	 * @param Name The name of the attribute.
 	 * @param Value The new value for the attribute.
+	 * @param bEvaluateAttributes Whether the attributes should be re-evaluated after the initial shape has been set.
 	 * @param bGenerateModel Whether a model should be generated after the attribute has been set.
 	 * @returns a callback proxy used to register for completion events.
 	 */
 	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = true), Category = "Vitruvio")
 	static UGenerateCompletedCallbackProxy* SetBoolAttribute(UVitruvioComponent* VitruvioComponent, const FString& Name, bool Value,
-															 bool bGenerateModel = true);
+															 bool bEvaluateAttributes, bool bGenerateModel = true);
 
 	/**
 	 * Sets the float array attribute with the given Name to the given value. Regenerates the model if bGenerateModel is set to true.
@@ -131,12 +131,13 @@ public:
 	 * @param VitruvioComponent The VitruvioComponent where the attribute is set
 	 * @param Name The name of the attribute.
 	 * @param Values The new values for the attribute.
+	 * @param bEvaluateAttributes Whether the attributes should be re-evaluated after the initial shape has been set.
 	 * @param bGenerateModel Whether a model should be generated after the attribute has been set.
 	 * @returns a callback proxy used to register for completion events.
 	 */
 	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = true), Category = "Vitruvio")
 	static UGenerateCompletedCallbackProxy* SetFloatArrayAttribute(UVitruvioComponent* VitruvioComponent, const FString& Name,
-																   const TArray<double>& Values, bool bGenerateModel = true);
+																   const TArray<double>& Values, bool bEvaluateAttributes, bool bGenerateModel = true);
 
 	/**
 	 * Sets a string array attribute with the given Name to the given value. Regenerates the model if bGenerateModel is set to true.
@@ -144,12 +145,13 @@ public:
 	 * @param VitruvioComponent The VitruvioComponent where the attribute is set
 	 * @param Name The name of the attribute.
 	 * @param Values The new values for the attribute.
+	 * @param bEvaluateAttributes Whether the attributes should be re-evaluated after the initial shape has been set.
 	 * @param bGenerateModel Whether a model should be generated after the attribute has been set.
 	 * @returns a callback proxy used to register for completion events.
 	 */
 	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = true), Category = "Vitruvio")
 	static UGenerateCompletedCallbackProxy* SetStringArrayAttribute(UVitruvioComponent* VitruvioComponent, const FString& Name,
-																	const TArray<FString>& Values, bool bGenerateModel = true);
+																	const TArray<FString>& Values, bool bEvaluateAttributes, bool bGenerateModel = true);
 
 	/**
 	 * Sets a bool array attribute with the given Name to the given value. Regenerates the model if bGenerateModel is set to true.
@@ -157,12 +159,13 @@ public:
 	 * @param VitruvioComponent The VitruvioComponent where the attribute is set.
 	 * @param Name The name of the attribute.
 	 * @param Values The new values for the attribute.
+	 * @param bEvaluateAttributes Whether the attributes should be re-evaluated after the initial shape has been set.
 	 * @param bGenerateModel Whether a model should be generated after the attribute has been set.
 	 * @returns a callback proxy used to register for completion events.
 	 */
 	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = true), Category = "Vitruvio")
 	static UGenerateCompletedCallbackProxy* SetBoolArrayAttribute(UVitruvioComponent* VitruvioComponent, const FString& Name,
-																  const TArray<bool>& Values, bool bGenerateModel = true);
+																  const TArray<bool>& Values, bool bEvaluateAttributes, bool bGenerateModel = true);
 
 	/**
 	 * Sets the given attributes. If a key from the NewAttributes is not found in the current attributes, the key-value pair will be ignored.
@@ -171,36 +174,52 @@ public:
 	 *
 	 * @param VitruvioComponent The VitruvioComponent where the attribute is set.
 	 * @param NewAttributes The attributes to be set.
+	 * @param bEvaluateAttributes Whether the attributes should be re-evaluated after the initial shape has been set.
 	 * @param bGenerateModel Whether a model should be generated after the attributes have been set.
 	 * @returns a callback proxy used to register for completion events.
 	 */
 	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = true), Category = "Vitruvio")
 	static UGenerateCompletedCallbackProxy* SetAttributes(UVitruvioComponent* VitruvioComponent, const TMap<FString, FString>& NewAttributes,
-														  bool bGenerateModel = true);
+														  bool bEvaluateAttributes, bool bGenerateModel = true);
 
 	/**
 	 * Sets the given static mesh as initial shape. Regenerates the model if bGenerateModel is set to true.
 	 *
 	 * @param VitruvioComponent The VitruvioComponent where the initial shape is set.
 	 * @param StaticMesh The new initial shape static mesh.
+	 * @param bEvaluateAttributes Whether the attributes should be re-evaluated after the initial shape has been set.
 	 * @param bGenerateModel Whether a model should be generated after the initial shape has set.
 	 * @returns a callback proxy used to register for completion events.
 	 */
 	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = true), Category = "Vitruvio")
 	static UGenerateCompletedCallbackProxy* SetMeshInitialShape(UVitruvioComponent* VitruvioComponent, UStaticMesh* StaticMesh,
-																bool bGenerateModel = true);
+																bool bEvaluateAttributes, bool bGenerateModel = true);
 
 	/**
 	 * Sets the given spline points as initial shape. Regenerates the model if bGenerateModel is set to true.
 	 *
 	 * @param VitruvioComponent The VitruvioComponent where the initial shape is set.
 	 * @param SplinePoints The new initial shape spline points.
+	 * @param bEvaluateAttributes Whether the attributes should be re-evaluated after the initial shape has been set.
 	 * @param bGenerateModel Whether a model should be generated after the initial shape has set.
 	 * @returns a callback proxy used to register for completion events.
 	 */
 	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = true), Category = "Vitruvio")
 	static UGenerateCompletedCallbackProxy* SetSplineInitialShape(UVitruvioComponent* VitruvioComponent, const TArray<FSplinePoint>& SplinePoints,
-																  bool bGenerateModel = true);
+																  bool bEvaluateAttributes, bool bGenerateModel = true);
+
+	/**
+	 * Sets the given static mesh as initial shape. Regenerates the model if bGenerateModel is set to true.
+	 *
+	 * @param VitruvioComponent The VitruvioComponent where the initial shape is set.
+	 * @param InitialShapePolygon the new initial shape polygon.
+	 * @param bEvaluateAttributes Whether the attributes should be re-evaluated after the initial shape has been set.
+	 * @param bGenerateModel Whether a model should be generated after the initial shape has set.
+	 * @returns a callback proxy used to register for completion events.
+	 */
+	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = true), Category = "Vitruvio")
+	static UGenerateCompletedCallbackProxy* SetPolygonInitialShape(UVitruvioComponent* VitruvioComponent, const FInitialShapePolygon& InitialShapePolygon,
+																bool bEvaluateAttributes, bool bGenerateModel = true);
 
 	/**
 	 * Converts the given Actors to VitruvioActors and optionally assigns the given RulePackage. If an Actor can not be converted (see
