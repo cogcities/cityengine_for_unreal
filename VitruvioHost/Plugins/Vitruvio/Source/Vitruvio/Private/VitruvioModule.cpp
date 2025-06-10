@@ -150,7 +150,7 @@ void SetInitialShapeGeometry(const InitialShapeBuilderUPtr& InitialShapeBuilder,
 	for (int VertexIndex = 0; VertexIndex < InitialShape.Polygon.Vertices.Num(); ++ VertexIndex)
 	{
 		
-		const FVector Vertex = InitialShape.Offset + InitialShape.Polygon.Vertices[VertexIndex];
+		const FVector Vertex = InitialShape.Position + InitialShape.Polygon.Vertices[VertexIndex];
 		const FVector CEVertex = FVector(Vertex.X, Vertex.Z, Vertex.Y) / 100.0;
 		vertexCoords.push_back(CEVertex.X);
 		vertexCoords.push_back(CEVertex.Y);
@@ -169,7 +169,7 @@ void SetInitialShapeGeometry(const InitialShapeBuilderUPtr& InitialShapeBuilder,
 		{
 			holes.push_back(faceCounts.size() - 1);
 
-			for (const FInitialShapeHole Hole : Face.Holes)
+			for (const FInitialShapeHole& Hole : Face.Holes)
 			{
 				faceCounts.push_back(Hole.Indices.Num());
 				for (const int32& Index : Hole.Indices)

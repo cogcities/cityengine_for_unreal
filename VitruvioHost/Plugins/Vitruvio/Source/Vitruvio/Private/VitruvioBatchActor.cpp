@@ -84,7 +84,7 @@ TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> UTile::GetInitialShap
 		ValidVitruvioComponents.Add(VitruvioComponent);
 		
 		FInitialShape InitialShape;
-		InitialShape.Offset = VitruvioComponent->GetOwner()->GetTransform().GetLocation();
+		InitialShape.Position = VitruvioComponent->GetOwner()->GetTransform().GetLocation();
 		InitialShape.Polygon = VitruvioComponent->InitialShape->GetPolygon();
 		InitialShape.Attributes = Vitruvio::CreateAttributeMap(VitruvioComponent->GetAttributes());
 		InitialShape.RandomSeed = VitruvioComponent->GetRandomSeed();

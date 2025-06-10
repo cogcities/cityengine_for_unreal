@@ -98,7 +98,7 @@ public:
 
 struct FInitialShape
 {
-	FVector Offset;
+	FVector Position;
 	FInitialShapePolygon Polygon;
 	AttributeMapUPtr Attributes;
 	int32 RandomSeed = 0;
