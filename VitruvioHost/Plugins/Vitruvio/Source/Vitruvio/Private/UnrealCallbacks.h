@@ -40,7 +40,8 @@ struct FModelDescription
 class UnrealCallbacks final : public IUnrealCallbacks
 {
 	TArray<AttributeMapBuilderUPtr>& AttributeMapBuilders;
-
+	FVector Offset;
+	
 	Vitruvio::FInstanceMap Instances;
 	TMap<FString, TSharedPtr<FVitruvioMesh>> InstanceMeshes;
 	TMap<FString, FString> InstanceNames;
@@ -51,7 +52,7 @@ class UnrealCallbacks final : public IUnrealCallbacks
 	
 public:
 	virtual ~UnrealCallbacks() override = default;
-	UnrealCallbacks(TArray<AttributeMapBuilderUPtr>& AttributeMapBuilders) : AttributeMapBuilders(AttributeMapBuilders) {}
+	UnrealCallbacks(TArray<AttributeMapBuilderUPtr>& AttributeMapBuilders, const FVector& Offset = FVector::ZeroVector) : AttributeMapBuilders(AttributeMapBuilders), Offset(Offset) {}
 
 	static constexpr int32 NoPrototypeIndex = -1;
 

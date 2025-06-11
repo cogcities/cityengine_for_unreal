@@ -159,7 +159,7 @@ public:
 	 * \param InitialShape
 	 * \return the generated UStaticMesh.
 	 */
-	VITRUVIO_API FGenerateResult GenerateAsync(FInitialShape InitialShape) const;
+	VITRUVIO_API FGenerateResult GenerateAsync(TArray<FInitialShape> InitialShapes) const;
 
 	/**
 	 * \brief Generate the models with the given InitialShape, RulePackage and Attributes.
@@ -167,7 +167,7 @@ public:
 	 * \param InitialShape
 	 * \return the generated UStaticMesh.
 	 */
-	VITRUVIO_API FGenerateResultDescription Generate(const FInitialShape& InitialShape) const;
+	VITRUVIO_API FGenerateResultDescription Generate(TArray<FInitialShape> InitialShapes) const;
 
 	/**
 	 * \brief Asynchronously evaluates attributes for the given initial shape and rule package.
@@ -283,7 +283,7 @@ private:
 	void* PrtDllHandle = nullptr;
 	prt::Object const* PrtLibrary = nullptr;
 	CacheObjectUPtr PrtCache;
-
+	
 	TUniquePtr<UnrealLogHandler> LogHandler;
 
 	TAtomic<bool> Initialized = false;

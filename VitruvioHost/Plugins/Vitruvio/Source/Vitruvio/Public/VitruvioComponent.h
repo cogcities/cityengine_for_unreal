@@ -130,6 +130,10 @@ public:
 		meta = (EditCondition = "!bBatchGenerate", EditConditionHides))
 	bool GenerateAutomatically = true;
 
+	/** Automatically generate after changing attributes or properties. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, DisplayName = "Enable Inter Occlusion Queries", Category = "Vitruvio")
+	bool bEnableOcclusionQueries = false;
+
 	/** Automatically hide initial shape after generation. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, DisplayName = "Hide Initial Shape after Generation", Category = "Vitruvio",
 		meta = (EditCondition = "!bBatchGenerate", EditConditionHides))
@@ -189,6 +193,7 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Vitruvio Replacmeents")
 	void SetInstanceReplacementAsset(UInstanceReplacementAsset* InstanceReplacementAsset);
+
 
 	/**
 	 * Generates a model using the current Rule Package and initial shape. If the attributes are not yet available, they will first be evaluated. If
@@ -525,6 +530,8 @@ private:
 	TMap<UMaterialInterface*, FString> MaterialIdentifiers;
 	TMap<FString, int32> UniqueMaterialIdentifiers;
 
+	TArray<FInitialShape> GetNeighboringShapes() const;
+	
 	void CalculateRandomSeed();
 
 	void NotifyAttributesChanged();
@@ -534,6 +541,9 @@ private:
 
 #if WITH_EDITOR
 	FDelegateHandle PropertyChangeDelegate;
+
+	FDelegateHandle OnActorMoved;
+	FDelegateHandle OnActorsMoved;
 #endif
 
 	friend class AVitruvioBatchActor;
