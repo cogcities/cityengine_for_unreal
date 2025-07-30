@@ -1181,9 +1181,17 @@ void UVitruvioComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
 		EvalAttributesInvalidationToken->Invalidate();
 	}
 
+	VitruvioModule::Get().InvalidateOcclusion(InitialShapeIndex);
+
 #if WITH_EDITOR
 	FCoreUObjectDelegates::OnObjectPropertyChanged.Remove(PropertyChangeDelegate);
 	PropertyChangeDelegate.Reset();
+
+	if (GEngine)
+	{
+		GEngine->OnActorMoved().Remove(OnActorMoved);
+		GEngine->OnActorsMoved().Remove(OnActorsMoved);
+	}
 #endif
 }
 
