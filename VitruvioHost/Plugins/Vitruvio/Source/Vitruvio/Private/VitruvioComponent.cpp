@@ -1181,7 +1181,7 @@ void UVitruvioComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
 		EvalAttributesInvalidationToken->Invalidate();
 	}
 
-	VitruvioModule::Get().InvalidateOcclusion(InitialShapeIndex);
+	VitruvioModule::Get().InvalidateOcclusionHandle(InitialShapeIndex);
 
 #if WITH_EDITOR
 	FCoreUObjectDelegates::OnObjectPropertyChanged.Remove(PropertyChangeDelegate);
@@ -1199,7 +1199,7 @@ void UVitruvioComponent::Generate(UGenerateCompletedCallbackProxy* CallbackProxy
 {
 	Initialize();
 	
-	VitruvioModule::Get().InvalidateOcclusion(InitialShapeIndex);
+	VitruvioModule::Get().InvalidateOcclusionHandle(InitialShapeIndex);
 
 	// Since we can not abort an ongoing generate call from PRT, we invalidate the result and regenerate after the current generate call has
 	// completed.

@@ -246,11 +246,16 @@ public:
 	VITRUVIO_API void UnregisterMesh(UStaticMesh* StaticMesh);
 
 	/**
-	 * Invalidates the occlusion of the given initial shape index.
+	 * Invalidates the occlusion handle of the given initial shape index.
 	 * 
 	 * @param InitialShapeIndex 
 	 */
-	VITRUVIO_API void InvalidateOcclusion(int64 InitialShapeIndex);
+	VITRUVIO_API void InvalidateOcclusionHandle(int64 InitialShapeIndex);
+
+	/**
+	 * Invalidates all occlusion handles.
+	 */
+	VITRUVIO_API void InvalidateAllOcclusionHandles();
 
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnGenerateCompleted, int);
 

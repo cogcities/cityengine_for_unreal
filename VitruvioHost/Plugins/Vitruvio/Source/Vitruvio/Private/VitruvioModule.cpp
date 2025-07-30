@@ -898,7 +898,7 @@ void VitruvioModule::UnregisterMesh(UStaticMesh* StaticMesh)
 	RegisteredMeshes.Remove(StaticMesh);
 }
 
-void VitruvioModule::InvalidateOcclusion(int64 InitialShapeIndex)
+void VitruvioModule::InvalidateOcclusionHandle(int64 InitialShapeIndex)
 {
 	FScopeLock Lock(&OcclusionLock);
 	if (!OcclusionSetByInitialShape.Contains(InitialShapeIndex))
@@ -913,6 +913,15 @@ void VitruvioModule::InvalidateOcclusion(int64 InitialShapeIndex)
 
 	OcclusionSetByInitialShape.Remove(InitialShapeIndex);
 	OcclusionHandleCache.Remove(InitialShapeIndex);
+}
+
+void VitruvioModule::InvalidateAllOcclusionHandles()
+{
+	FScopeLock Lock(&OcclusionLock);
+
+	OcclusionSetByInitialShape.Empty();
+	OcclusionHandleCache.Empty();
+	OcclusionSetCache.Empty();
 }
 
 void VitruvioModule::NotifyGenerateCompleted() const

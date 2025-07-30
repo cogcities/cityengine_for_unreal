@@ -44,4 +44,6 @@ private:
 	FDelegateHandle OnAssetReloadHandle;
 	FDelegateHandle MapChangedHandle;
 	FDelegateHandle PostUndoRedoDelegate;
+	FDelegateHandle StartPIEHandle;
+	FDelegateHandle EndPIEHandle;
 };
