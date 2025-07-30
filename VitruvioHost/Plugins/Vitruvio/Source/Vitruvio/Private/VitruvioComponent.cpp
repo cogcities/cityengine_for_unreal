@@ -43,6 +43,8 @@ TAutoConsoleVariable CVarInterOcclusionNeighborQueryDistance(TEXT("Esri.Vitruvio
 namespace
 {
 
+int64 InitialShapeCounter;
+
 bool ToBool(const FString& Value)
 {
 	if (Value.ToLower() == "true")
@@ -451,6 +453,13 @@ UVitruvioComponent::UVitruvioComponent()
 
 	PrimaryComponentTick.bCanEverTick = true;
 	bTickInEditor = true;
+
+	InitialShapeIndex = InitialShapeCounter++;
+}
+
+int64 UVitruvioComponent::GetInitialShapeIndex() const
+{
+	return InitialShapeIndex;
 }
 
 TArray<FInitialShape> UVitruvioComponent::GetNeighboringShapes() const
@@ -477,7 +486,7 @@ TArray<FInitialShape> UVitruvioComponent::GetNeighboringShapes() const
 		const float Distance = FVector::Dist(OwnerLocation, Actor->GetActorLocation());
 		if (Distance < CVarInterOcclusionNeighborQueryDistance.GetValueOnGameThread())
 		{
-			NeighboringShapes.Add({ Actor->GetTransform().GetLocation(), VitruvioComponent->InitialShape->GetPolygon(),
+			NeighboringShapes.Add({ VitruvioComponent->GetInitialShapeIndex(), Actor->GetTransform().GetLocation(), VitruvioComponent->InitialShape->GetPolygon(),
 				Vitruvio::CreateAttributeMap({ }), 0, nullptr });
 		}
 	}
@@ -1181,6 +1190,8 @@ void UVitruvioComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
 void UVitruvioComponent::Generate(UGenerateCompletedCallbackProxy* CallbackProxy, const FGenerateOptions& GenerateOptions)
 {
 	Initialize();
+	
+	VitruvioModule::Get().InvalidateOcclusion(InitialShapeIndex);
 
 	// Since we can not abort an ongoing generate call from PRT, we invalidate the result and regenerate after the current generate call has
 	// completed.
@@ -1207,7 +1218,7 @@ void UVitruvioComponent::Generate(UGenerateCompletedCallbackProxy* CallbackProxy
 	if (InitialShape)
 	{
 		TArray<FInitialShape> Shapes;
-		Shapes.Add( { GetOwner()->GetTransform().GetLocation(), InitialShape->GetPolygon(), Vitruvio::CreateAttributeMap(Attributes), RandomSeed, Rpk } );
+		Shapes.Add( { GetInitialShapeIndex(), GetOwner()->GetTransform().GetLocation(), InitialShape->GetPolygon(), Vitruvio::CreateAttributeMap(Attributes), RandomSeed, Rpk } );
 	
 		if (bEnableOcclusionQueries)
 		{
@@ -1442,7 +1453,7 @@ void UVitruvioComponent::EvaluateRuleAttributes(bool ForceRegenerate, UGenerateC
 	bAttributesReady = false;
 
 	FAttributeMapResult AttributesResult =
-		VitruvioModule::Get().EvaluateRuleAttributesAsync({ FVector::ZeroVector, InitialShape->GetPolygon(), Vitruvio::CreateAttributeMap(Attributes), RandomSeed, Rpk});
+		VitruvioModule::Get().EvaluateRuleAttributesAsync({ GetInitialShapeIndex(), FVector::ZeroVector, InitialShape->GetPolygon(), Vitruvio::CreateAttributeMap(Attributes), RandomSeed, Rpk});
 
 	EvalAttributesInvalidationToken = AttributesResult.Token;
 

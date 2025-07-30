@@ -439,6 +439,9 @@ public:
 	/* Returns the material identifier of the given material for replacements. */
 	FString GetMaterialIdentifier(const UMaterialInterface* SourceMaterial) const;
 
+	/* Returns a unique initial shape index. */;
+	int64 GetInitialShapeIndex() const;
+
 	/**
 	 * Evaluate rule attributes.
 	 *
@@ -514,6 +517,8 @@ private:
 
 	UPROPERTY(Transient)
 	bool bInitialized = false;
+
+	int64 InitialShapeIndex;
 
 	bool bInGenerateCallback = false;
 

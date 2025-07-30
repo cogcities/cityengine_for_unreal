@@ -84,6 +84,7 @@ TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> UTile::GetInitialShap
 		ValidVitruvioComponents.Add(VitruvioComponent);
 		
 		FInitialShape InitialShape;
+		InitialShape.InitialShapeIndex = VitruvioComponent->GetInitialShapeIndex();
 		InitialShape.Position = VitruvioComponent->GetOwner()->GetTransform().GetLocation();
 		InitialShape.Polygon = VitruvioComponent->InitialShape->GetPolygon();
 		InitialShape.Attributes = Vitruvio::CreateAttributeMap(VitruvioComponent->GetAttributes());

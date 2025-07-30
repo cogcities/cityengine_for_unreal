@@ -98,6 +98,7 @@ public:
 
 struct FInitialShape
 {
+	int64 InitialShapeIndex;
 	FVector Position;
 	FInitialShapePolygon Polygon;
 	AttributeMapUPtr Attributes;
@@ -244,6 +245,13 @@ public:
 	 */
 	VITRUVIO_API void UnregisterMesh(UStaticMesh* StaticMesh);
 
+	/**
+	 * Invalidates the occlusion of the given initial shape index.
+	 * 
+	 * @param InitialShapeIndex 
+	 */
+	VITRUVIO_API void InvalidateOcclusion(int64 InitialShapeIndex);
+
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnGenerateCompleted, int);
 
 	DECLARE_MULTICAST_DELEGATE_TwoParams(FOnAllGenerateCompleted, int, int);
@@ -302,6 +310,12 @@ private:
 	TMap<Vitruvio::FMaterialAttributeContainer, TObjectPtr<UMaterialInstanceDynamic>> MaterialCache;
 	TMap<FString, Vitruvio::FTextureData> TextureCache;
 	FMeshCache MeshCache;
+
+	mutable FCriticalSection OcclusionLock;
+	mutable TMap<int64, prt::OcclusionSet::Handle> OcclusionHandleCache;
+
+	mutable TMap<TLazyObjectPtr<URulePackage>, OcclusionSetUPtr> OcclusionSetCache;
+	mutable TMap<int64, prt::OcclusionSet*> OcclusionSetByInitialShape;
 
 	FCriticalSection RegisterMeshLock;
 	TSet<TObjectPtr<UStaticMesh>> RegisteredMeshes;
