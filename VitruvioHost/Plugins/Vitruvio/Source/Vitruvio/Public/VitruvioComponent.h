@@ -130,8 +130,9 @@ public:
 		meta = (EditCondition = "!bBatchGenerate", EditConditionHides))
 	bool GenerateAutomatically = true;
 
-	/** Automatically generate after changing attributes or properties. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, DisplayName = "Enable Inter Occlusion Queries", Category = "Vitruvio")
+	/** Enable inter occlusion Queries. Note that for batch generated models this setting is ignored and instead VitruvioBatchActor#bEnableOcclusionQueries is used. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, DisplayName = "Enable Inter Occlusion Queries", Category = "Vitruvio",
+		meta = (EditCondition = "!bBatchGenerate", EditConditionHides))
 	bool bEnableOcclusionQueries = false;
 
 	/** Automatically hide initial shape after generation. */

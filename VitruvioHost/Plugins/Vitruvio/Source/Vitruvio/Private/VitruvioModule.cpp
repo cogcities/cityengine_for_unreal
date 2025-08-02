@@ -390,21 +390,21 @@ Vitruvio::FTextureData VitruvioModule::DecodeTexture(UObject* Outer, const FStri
 	return Vitruvio::DecodeTexture(Outer, Key, Path, TextureMetadata, std::move(Buffer), BufferSize);
 }
 
-FBatchGenerateResult VitruvioModule::BatchGenerateAsync(TArray<FInitialShape> InitialShapes) const
+FBatchGenerateResult VitruvioModule::BatchGenerateAsync(TArray<FInitialShape> InitialShapes, bool bGenerateOccluders) const
 {
     const FBatchGenerateResult::FTokenPtr Token = MakeShared<FGenerateToken>();
     	
 	CHECK_PRT_INITIALIZED_ASYNC(FBatchGenerateResult, Token)
 
-	FBatchGenerateResult::FFutureType ResultFuture = Async(EAsyncExecution::Thread, [this, Token, InitialShapes = MoveTemp(InitialShapes)]() mutable {
-		FGenerateResultDescription Result = BatchGenerate(MoveTemp(InitialShapes));
+	FBatchGenerateResult::FFutureType ResultFuture = Async(EAsyncExecution::Thread, [this, Token, InitialShapes = MoveTemp(InitialShapes), bGenerateOccluders]() mutable {
+		FGenerateResultDescription Result = BatchGenerate(MoveTemp(InitialShapes), bGenerateOccluders);
 		return FBatchGenerateResult::ResultType { Token, MoveTemp(Result) };
 	});
 
 	return FBatchGenerateResult { MoveTemp(ResultFuture), Token };
 }
 
-FGenerateResultDescription VitruvioModule::BatchGenerate(TArray<FInitialShape> InitialShapes) const
+FGenerateResultDescription VitruvioModule::BatchGenerate(TArray<FInitialShape> InitialShapes, bool bGenerateOccluders) const
 {
 	if (InitialShapes.IsEmpty())
 	{
@@ -459,9 +459,11 @@ FGenerateResultDescription VitruvioModule::BatchGenerate(TArray<FInitialShape> I
 	
 	TArray<InitialShapeBuilderUPtr> InitialShapeBuilders;
 	InitialShapeUPtrVector InitialShapeUPtrs;
-	InitialShapeNOPtrVector InitialShapePtrs;
 
-	ForeachInitialShape([&InitialShapeBuilders, &InitialShapeUPtrs, &InitialShapePtrs]
+	TMap<int64, const prt::InitialShape*> InitialShapeByIndex;
+	TMap<const prt::InitialShape*, int64> IndexByInitialShape;
+
+	ForeachInitialShape([&InitialShapeBuilders, &InitialShapeUPtrs, &InitialShapeByIndex, &IndexByInitialShape]
 		(int32 InitialShapeIndex, const FInitialShape& InitialShape, const FStartRuleInfo& StartRuleInfo)
 	{
 		InitialShapeBuilderUPtr InitialShapeBuilder(prt::InitialShapeBuilder::create());
@@ -469,7 +471,9 @@ FGenerateResultDescription VitruvioModule::BatchGenerate(TArray<FInitialShape> I
 		InitialShapeBuilder->setAttributes(*StartRuleInfo.RuleFile, *StartRuleInfo.StartRule, InitialShape.RandomSeed, L"",
 			InitialShape.Attributes.get(), StartRuleInfo.ResolveMap.get());
 		InitialShapeUPtr Shape(InitialShapeBuilder->createInitialShape());
-		InitialShapePtrs.push_back(Shape.get());
+
+		InitialShapeByIndex.Add(InitialShape.InitialShapeIndex, Shape.get());
+		IndexByInitialShape.Add(Shape.get(), InitialShape.InitialShapeIndex);
 		InitialShapeUPtrs.push_back(std::move(Shape));
 
 		InitialShapeBuilders.Add(MoveTemp(InitialShapeBuilder));
@@ -494,7 +498,9 @@ FGenerateResultDescription VitruvioModule::BatchGenerate(TArray<FInitialShape> I
 		GenerateOptionsBuilder->setInt(L"numberWorkerThreads", FPlatformMisc::NumberOfCores());
 		const AttributeMapUPtr GenerateOptions(GenerateOptionsBuilder->createAttributeMapAndReset());
 
-		prt::Status GenerateStatus = generate(InitialShapePtrs.data(), InitialShapePtrs.size(), nullptr, EncoderIds.data(),
+		TArray<const prt::InitialShape*> InitialShapesPtrs;
+		InitialShapeByIndex.GenerateValueArray(InitialShapesPtrs);
+		prt::Status GenerateStatus = generate(InitialShapesPtrs.GetData(), InitialShapesPtrs.Num(), nullptr, EncoderIds.data(),
 			EncoderIds.size(), EncoderOptions.data(), OutputHandler.Get(),
 					  PrtCache.get(), nullptr, GenerateOptions.get());
 
@@ -515,44 +521,138 @@ FGenerateResultDescription VitruvioModule::BatchGenerate(TArray<FInitialShape> I
 		});
 	}
 
-	// Generate
+	// Generate Occluders
 	TArray<AttributeMapBuilderUPtr> GenerateAttributeMapBuilders;
 	TSharedPtr<UnrealCallbacks> GenerateOutputHandler(new UnrealCallbacks(GenerateAttributeMapBuilders));
+	
+
+	
+	if (bGenerateOccluders)
 	{
-		InitialShapeUPtrs.clear();
-		InitialShapePtrs.clear();
-
-		ForeachInitialShape([&InitialShapeBuilders, &EvaluatedAttributes, &InitialShapePtrs, &InitialShapeUPtrs]
-			(int32 InitialShapeIndex, const FInitialShape& InitialShape, const FStartRuleInfo& StartRuleInfo)
-		{
-			const InitialShapeBuilderUPtr& InitialShapeBuilder = InitialShapeBuilders[InitialShapeIndex];
-			InitialShapeBuilder->setAttributes(*StartRuleInfo.RuleFile, *StartRuleInfo.StartRule, InitialShape.RandomSeed, L"",
-				EvaluatedAttributes[InitialShapeIndex]->AttributeMap.get(), StartRuleInfo.ResolveMap.get());
-			InitialShapeUPtr Shape(InitialShapeBuilder->createInitialShapeAndReset());
-			InitialShapePtrs.push_back(Shape.get());
-			InitialShapeUPtrs.push_back(std::move(Shape));
-		});
+		FScopeLock Lock(&OcclusionLock);
 		
-	    AttributeMapBuilderUPtr AttributeMapBuilder(prt::AttributeMapBuilder::create());
+		TMap<int64, prt::OcclusionSet*> OcclusionSetsByInitialShapeIndex;
+		TMap<prt::OcclusionSet*, TArray<int64>> InitialShapeIndicesByOcclusionSet;
 
-	    const std::vector UnrealEncoderIds = { UNREAL_GEOMETRY_ENCODER_ID };
-	    const AttributeMapUPtr UnrealEncoderOptions(prtu::createValidatedOptions(UNREAL_GEOMETRY_ENCODER_ID));
-	    const AttributeMapNOPtrVector GenerateEncoderOptions = {UnrealEncoderOptions.get()};
+		for (auto& [StartRuleInfo, InitialShapesByRpk] : RuleInfoInitialShapes)
+		{
+			for (const FInitialShape& InitialShape : InitialShapesByRpk)
+			{
+				if (!OcclusionSetCache.Contains(InitialShape.RulePackage))
+				{
+					OcclusionSetUPtr OcclusionSetPtr { prt::OcclusionSet::create() };
+					OcclusionSetCache.Add(InitialShape.RulePackage, MoveTemp(OcclusionSetPtr));
+				}
+
+				prt::OcclusionSet* OcclusionSet = OcclusionSetCache[InitialShape.RulePackage].get();
+				InitialShapeIndicesByOcclusionSet.FindOrAdd(OcclusionSet).Add(InitialShape.InitialShapeIndex);
+				OcclusionSetsByInitialShapeIndex.Add(InitialShape.InitialShapeIndex, OcclusionSet);
+			}
+		}
+
+		TMap<int64, const prt::InitialShape*> OcclusionInitialShapeByIndex;
+		TMap<const prt::InitialShape*, int64> OcclusionInitialShapeIndexByInitialShape;
+		for (int ShapeIndex = 0; ShapeIndex < InitialShapes.Num(); ++ShapeIndex)
+		{
+			const FInitialShape& InitialShape = InitialShapes[ShapeIndex];
+
+			prt::OcclusionSet* OcclusionSet = OcclusionSetsByInitialShapeIndex[InitialShape.InitialShapeIndex];
+			
+			OcclusionSetByInitialShape.Add(InitialShape.InitialShapeIndex, OcclusionSet);
+		
+			if (!OcclusionHandleCache.Contains(InitialShape.InitialShapeIndex))
+			{
+				const prt::InitialShape* InitialShapePtr = InitialShapeByIndex[InitialShape.InitialShapeIndex];
+				OcclusionInitialShapeByIndex.Add(InitialShape.InitialShapeIndex, InitialShapePtr);
+				OcclusionInitialShapeIndexByInitialShape.Add(InitialShapePtr, InitialShape.InitialShapeIndex);
+			}
+		}
+
+		if (!OcclusionInitialShapeByIndex.IsEmpty())
+		{
+			for (const auto& [OcclusionSet, InitialShapeIndices] : InitialShapeIndicesByOcclusionSet)
+			{
+				TArray<prt::OcclusionSet::Handle> NewOcclusionHandles;
+				NewOcclusionHandles.SetNum(InitialShapeIndices.Num());
+
+				TArray<const prt::InitialShape*> OcclusionShapesArray;
+
+				for (int64 InitialShapeIndex : InitialShapeIndices)
+				{
+					if (OcclusionInitialShapeByIndex.Contains(InitialShapeIndex))
+					{
+						OcclusionShapesArray.Add(OcclusionInitialShapeByIndex[InitialShapeIndex]);
+					}
+				}
+		
+				const prt::Status GenerateOccludersStatus =  generateOccluders(OcclusionShapesArray.GetData(), OcclusionShapesArray.Num(), NewOcclusionHandles.GetData(), nullptr, 0,
+		nullptr, GenerateOutputHandler.Get(), PrtCache.get(), OcclusionSet);
+
+				if (GenerateOccludersStatus != prt::STATUS_OK)
+				{
+					GenerateCallsCounter.Decrement();
+				
+					UE_LOG(LogUnrealPrt, Error, TEXT("PRT generateOccluders failed: %hs"), prt::getStatusDescription(GenerateOccludersStatus))
+					return {};
+				}
+
+				for (int32 OcclusionShapeIndex = 0; OcclusionShapeIndex < OcclusionShapesArray.Num(); ++OcclusionShapeIndex)
+				{
+					const prt::InitialShape* InitialShape = OcclusionShapesArray[OcclusionShapeIndex];
+					prt::OcclusionSet::Handle OcclusionHandle = NewOcclusionHandles[OcclusionShapeIndex];
+					int64 OcclusionInitialShapeIndex = OcclusionInitialShapeIndexByInitialShape[InitialShape];
+
+					OcclusionHandleCache.Add(OcclusionInitialShapeIndex, OcclusionHandle);
+				}
+			}
+		}
+	}
+
+	// Generate
+	TMap<URulePackage*, TArray<FInitialShape>> InitialShapeByRulePackage;
+	for (FInitialShape& InitialShape : InitialShapes)
+	{
+		InitialShapeByRulePackage.FindOrAdd(InitialShape.RulePackage).Add(MoveTemp(InitialShape));
+	}
+	
+	for (auto& [RulePackage, InitialShapesByRpk] : InitialShapeByRulePackage)
+	{
+		AttributeMapBuilderUPtr AttributeMapBuilder(prt::AttributeMapBuilder::create());
+
+		const std::vector UnrealEncoderIds = { UNREAL_GEOMETRY_ENCODER_ID };
+		const AttributeMapUPtr UnrealEncoderOptions(prtu::createValidatedOptions(UNREAL_GEOMETRY_ENCODER_ID));
+		const AttributeMapNOPtrVector GenerateEncoderOptions = {UnrealEncoderOptions.get()};
 
 		AttributeMapBuilderUPtr GenerateOptionsBuilder(prt::AttributeMapBuilder::create());
 		GenerateOptionsBuilder->setInt(L"numberWorkerThreads", FPlatformMisc::NumberOfCores());
 		const AttributeMapUPtr GenerateOptions(GenerateOptionsBuilder->createAttributeMapAndReset());
 
-	    prt::Status GenerateStatus = generate(InitialShapePtrs.data(), InitialShapePtrs.size(), nullptr,
+		prt::OcclusionSet* OcclusionSet = bGenerateOccluders ? OcclusionSetCache[RulePackage].get() : nullptr;
+		TArray<const prt::InitialShape*> InitialShapePtrs;
+		TArray<prt::OcclusionSet::Handle> OcclusionHandles;
+
+		for (const FInitialShape& InitialShape : InitialShapesByRpk)
+		{
+			const prt::InitialShape* InitialShapePtr = InitialShapeByIndex[InitialShape.InitialShapeIndex];
+			InitialShapePtrs.Add(InitialShapePtr);
+			if (bGenerateOccluders)
+			{
+				OcclusionHandles.Add(OcclusionHandleCache[InitialShape.InitialShapeIndex]);
+			}
+		}
+
+		prt::OcclusionSet::Handle* OcclusionHandlesPtr = bGenerateOccluders ? OcclusionHandles.GetData() : nullptr;
+		
+		prt::Status GenerateStatus = generate(InitialShapePtrs.GetData(), InitialShapePtrs.Num(), OcclusionHandlesPtr,
 			UnrealEncoderIds.data(), UnrealEncoderIds.size(), GenerateEncoderOptions.data(), GenerateOutputHandler.Get(),
-			PrtCache.get(), nullptr, GenerateOptions.get());
+			PrtCache.get(), OcclusionSet, GenerateOptions.get());
 
 		if (GenerateStatus != prt::STATUS_OK)
-	    {
+		{
 			GenerateCallsCounter.Subtract(InitialShapes.Num());
-    		UE_LOG(LogUnrealPrt, Error, TEXT("PRT generate failed: %hs"), prt::getStatusDescription(GenerateStatus))
-    		return {};
-	    }
+			UE_LOG(LogUnrealPrt, Error, TEXT("PRT generate failed: %hs"), prt::getStatusDescription(GenerateStatus))
+			return {};
+		}
 	}
 
 	CHECK_PRT_INITIALIZED()
@@ -913,6 +1013,38 @@ void VitruvioModule::InvalidateOcclusionHandle(int64 InitialShapeIndex)
 
 	OcclusionSetByInitialShape.Remove(InitialShapeIndex);
 	OcclusionHandleCache.Remove(InitialShapeIndex);
+}
+
+void VitruvioModule::InvalidateOcclusionHandles(const TArray<int64>& InitialShapeIndices)
+{
+	FScopeLock Lock(&OcclusionLock);
+
+	TMap<prt::OcclusionSet*, TArray<int64>> InitialShapeIndicesByOcclusionSet;
+	for (int64 InitialShapeIndex : InitialShapeIndices)
+	{
+		if (prt::OcclusionSet** OcclusionSetResult = OcclusionSetByInitialShape.Find(InitialShapeIndex))
+		{
+			InitialShapeIndicesByOcclusionSet.FindOrAdd(*OcclusionSetResult).Add(InitialShapeIndex);
+		}
+	}
+
+	for (const auto& [OcclusionSet, InitialShapeIndices] : InitialShapeIndicesByOcclusionSet)
+	{
+		TArray<prt::OcclusionSet::Handle> InvalidateHandles;
+		for (int32 Index = 0; Index < InitialShapeIndices.Num(); ++Index)
+		{
+			int64 InitialShapeIndex = InitialShapeIndices[Index];
+			if (OcclusionHandleCache.Contains(InitialShapeIndex))
+			{
+				InvalidateHandles.Add(OcclusionHandleCache[InitialShapeIndex]);
+			}
+
+			OcclusionSetByInitialShape.Remove(InitialShapeIndex);
+			OcclusionHandleCache.Remove(InitialShapeIndex);
+		}
+
+		OcclusionSet->dispose(InvalidateHandles.GetData(), InvalidateHandles.Num());
+	}
 }
 
 void VitruvioModule::InvalidateAllOcclusionHandles()

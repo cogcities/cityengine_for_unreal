@@ -21,6 +21,19 @@
 #include "GenerateCompletedCallbackProxy.h"
 #include "PhysicsEngine/BodySetup.h"
 
+namespace 
+{
+TArray<int64> GetInitialShapeIndices(const TArray<FInitialShape>& InitialShapes)
+{
+	TArray<int64> Indices;
+	for (const FInitialShape& InitialShape : InitialShapes)
+	{
+		Indices.Add(InitialShape.InitialShapeIndex);
+	}
+	return Indices;
+}
+} // namespace
+
 void UTile::MarkForAttributeEvaluation(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy)
 {
 	bMarkedForEvaluateAttributes = true;
@@ -313,8 +326,13 @@ void AVitruvioBatchActor::ProcessTiles()
 			{
 				Tile->GenerateToken->Invalidate();
 			}
+
+			if (bEnableOcclusionQueries)
+			{
+				VitruvioModule::Get().InvalidateOcclusionHandles(GetInitialShapeIndices(InitialShapes));
+			}
 			
-			FBatchGenerateResult GenerateResult = VitruvioModule::Get().BatchGenerateAsync(MoveTemp(InitialShapes));
+			FBatchGenerateResult GenerateResult = VitruvioModule::Get().BatchGenerateAsync(MoveTemp(InitialShapes), bEnableOcclusionQueries);
 			
 			Tile->GenerateToken = GenerateResult.Token;
 			Tile->bIsGenerating = true;
@@ -395,12 +413,15 @@ void AVitruvioBatchActor::ProcessGenerateQueue()
 
 		ProcessGenerateQueueCriticalSection.Unlock();
 
-		for (int ComponentIndex = 0; ComponentIndex < Item.VitruvioComponents.Num(); ++ComponentIndex)
+		if (Item.GenerateResultDescription.EvaluatedAttributes.Num() ==  Item.VitruvioComponents.Num())
 		{
-			UVitruvioComponent* VitruvioComponent = Item.VitruvioComponents[ComponentIndex];
-			Item.GenerateResultDescription.EvaluatedAttributes[ComponentIndex]->UpdateUnrealAttributeMap(VitruvioComponent->Attributes, VitruvioComponent);
-			VitruvioComponent->bAttributesReady = true;
-			VitruvioComponent->NotifyAttributesChanged();
+			for (int ComponentIndex = 0; ComponentIndex < Item.VitruvioComponents.Num(); ++ComponentIndex)
+			{
+				UVitruvioComponent* VitruvioComponent = Item.VitruvioComponents[ComponentIndex];
+				Item.GenerateResultDescription.EvaluatedAttributes[ComponentIndex]->UpdateUnrealAttributeMap(VitruvioComponent->Attributes, VitruvioComponent);
+				VitruvioComponent->bAttributesReady = true;
+				VitruvioComponent->NotifyAttributesChanged();
+			}
 		}
 
 		UGeneratedModelStaticMeshComponent* VitruvioModelComponent = Item.Tile->GeneratedModelComponent;

@@ -130,7 +130,7 @@ public:
 	 * \param InitialShapes
 	 * \return the generated UStaticMesh.
 	 */
-	VITRUVIO_API FBatchGenerateResult BatchGenerateAsync(TArray<FInitialShape> InitialShapes) const;
+	VITRUVIO_API FBatchGenerateResult BatchGenerateAsync(TArray<FInitialShape> InitialShapes, bool bGenerateOccluders) const;
 
 	/**
 	 * \brief Generate the models with the given InitialShapes.
@@ -138,7 +138,7 @@ public:
 	 * \param InitialShapes
 	 * \return the generated UStaticMesh.
 	 */
-	VITRUVIO_API FGenerateResultDescription BatchGenerate(TArray<FInitialShape> InitialShapes) const;
+	VITRUVIO_API FGenerateResultDescription BatchGenerate(TArray<FInitialShape> InitialShapes, bool bGenerateOccluders) const;
 
 	/**
 	 * \brief Asynchronously Evaluates attributes for the given initial shapes and rule packages.
@@ -157,7 +157,7 @@ public:
 	/**
 	 * \brief Asynchronously generate the models with the given InitialShape, RulePackage and Attributes.
 	 *
-	 * \param InitialShape
+	 * \param InitialShapes
 	 * \return the generated UStaticMesh.
 	 */
 	VITRUVIO_API FGenerateResult GenerateAsync(TArray<FInitialShape> InitialShapes) const;
@@ -165,7 +165,7 @@ public:
 	/**
 	 * \brief Generate the models with the given InitialShape, RulePackage and Attributes.
 	 *
-	 * \param InitialShape
+	 * \param InitialShapes
 	 * \return the generated UStaticMesh.
 	 */
 	VITRUVIO_API FGenerateResultDescription Generate(TArray<FInitialShape> InitialShapes) const;
@@ -251,6 +251,13 @@ public:
 	 * @param InitialShapeIndex 
 	 */
 	VITRUVIO_API void InvalidateOcclusionHandle(int64 InitialShapeIndex);
+
+	/**
+	 * Invalidates the occlusion handles of the given initial shape indices.
+	 * 
+	 * @param InitialShapeIndices 
+	 */
+	VITRUVIO_API void InvalidateOcclusionHandles(const TArray<int64>& InitialShapeIndices);
 
 	/**
 	 * Invalidates all occlusion handles.
