@@ -326,8 +326,7 @@ private:
 	mutable FCriticalSection OcclusionLock;
 	mutable TMap<int64, prt::OcclusionSet::Handle> OcclusionHandleCache;
 
-	mutable TMap<TLazyObjectPtr<URulePackage>, OcclusionSetUPtr> OcclusionSetCache;
-	mutable TMap<int64, prt::OcclusionSet*> OcclusionSetByInitialShape;
+	mutable OcclusionSetUPtr OcclusionSet;
 
 	FCriticalSection RegisterMeshLock;
 	TSet<TObjectPtr<UStaticMesh>> RegisteredMeshes;
