@@ -15,7 +15,7 @@
 
 #include "VitruvioComponent.h"
 
-#include "AttributeConversion.h"
+#include "Util/AttributeConversion.h"
 #include "EngineUtils.h"
 #include "GenerateCompletedCallbackProxy.h"
 #include "GeneratedModelHISMComponent.h"
@@ -30,7 +30,6 @@
 #include "Engine/CollisionProfile.h"
 #include "PRTUtils.h"
 #include "VitruvioBatchSubsystem.h"
-#include "PhysicsEngine/BodySetup.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/World.h"
 #include "Materials/Material.h"
@@ -38,7 +37,7 @@
 
 DEFINE_LOG_CATEGORY(LogVitruvioComponent);
 
-TAutoConsoleVariable CVarInterOcclusionNeighborQueryDistance(TEXT("Esri.Vitruvio.InterOcclusionNeighborQueryDistance"), 10000, TEXT("The distance in cm to query for inter-occlusion neighbors."));
+TAutoConsoleVariable<float> CVarInterOcclusionNeighborQueryDistance(TEXT("Esri.Vitruvio.InterOcclusionNeighborQueryDistance"), 10000.0f, TEXT("The distance in cm to query for inter-occlusion neighbors."));
 
 namespace
 {

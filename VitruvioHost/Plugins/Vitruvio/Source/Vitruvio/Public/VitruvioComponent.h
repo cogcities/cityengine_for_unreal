@@ -33,6 +33,8 @@ DECLARE_LOG_CATEGORY_EXTERN(LogVitruvioComponent, Log, All);
 
 class UGenerateCompletedCallbackProxy;
 
+extern TAutoConsoleVariable<float> CVarInterOcclusionNeighborQueryDistance;
+
 USTRUCT(BlueprintType)
 struct FGenerateOptions
 {
@@ -553,4 +555,5 @@ private:
 #endif
 
 	friend class AVitruvioBatchActor;
+
 };
