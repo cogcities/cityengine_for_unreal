@@ -560,6 +560,7 @@ FGenerateResultDescription VitruvioModule::BatchGenerate(TArray<FInitialShape> I
 		OcclusionLock.Lock();
 					
 		InvalidateOcclusionHandles(InitialShapeIndices);
+		InvalidateOcclusionHandles(OccluderShapeIndices);
 
 		ForeachInitialShape(true, false, [&]
 			(int32, const FInitialShape& InitialShape, const FStartRuleInfo& StartRuleInfo)
