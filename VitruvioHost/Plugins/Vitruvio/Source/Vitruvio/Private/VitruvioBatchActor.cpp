@@ -644,7 +644,8 @@ void AVitruvioBatchActor::PostEditChangeProperty(FPropertyChangedEvent& Property
 	}
 	
 	if (PropertyChangedEvent.Property->GetFName() == GET_MEMBER_NAME_CHECKED(UVitruvioComponent, MaterialReplacement) ||
-		PropertyChangedEvent.Property->GetFName() == GET_MEMBER_NAME_CHECKED(UVitruvioComponent, InstanceReplacement))
+		PropertyChangedEvent.Property->GetFName() == GET_MEMBER_NAME_CHECKED(UVitruvioComponent, InstanceReplacement) ||
+		PropertyChangedEvent.MemberProperty->GetFName() == GET_MEMBER_NAME_CHECKED(AVitruvioBatchActor, bEnableOcclusionQueries))
 	{
 		GenerateAll();
 	}
