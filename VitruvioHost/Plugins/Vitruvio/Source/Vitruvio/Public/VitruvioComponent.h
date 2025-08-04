@@ -33,6 +33,8 @@ DECLARE_LOG_CATEGORY_EXTERN(LogVitruvioComponent, Log, All);
 
 class UGenerateCompletedCallbackProxy;
 
+extern TAutoConsoleVariable<float> CVarInterOcclusionNeighborQueryDistance;
+
 USTRUCT(BlueprintType)
 struct FGenerateOptions
 {
@@ -130,6 +132,11 @@ public:
 		meta = (EditCondition = "!bBatchGenerate", EditConditionHides))
 	bool GenerateAutomatically = true;
 
+	/** Enable inter occlusion Queries. Note that for batch generated models this setting is ignored and instead VitruvioBatchActor#bEnableOcclusionQueries is used. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, DisplayName = "Enable Inter Occlusion Queries", Category = "Vitruvio",
+		meta = (EditCondition = "!bBatchGenerate", EditConditionHides))
+	bool bEnableOcclusionQueries = false;
+
 	/** Automatically hide initial shape after generation. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, DisplayName = "Hide Initial Shape after Generation", Category = "Vitruvio",
 		meta = (EditCondition = "!bBatchGenerate", EditConditionHides))
@@ -189,6 +196,7 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Vitruvio Replacmeents")
 	void SetInstanceReplacementAsset(UInstanceReplacementAsset* InstanceReplacementAsset);
+
 
 	/**
 	 * Generates a model using the current Rule Package and initial shape. If the attributes are not yet available, they will first be evaluated. If
@@ -434,6 +442,9 @@ public:
 	/* Returns the material identifier of the given material for replacements. */
 	FString GetMaterialIdentifier(const UMaterialInterface* SourceMaterial) const;
 
+	/* Returns a unique initial shape index. */;
+	int64 GetInitialShapeIndex() const;
+
 	/**
 	 * Evaluate rule attributes.
 	 *
@@ -510,6 +521,8 @@ private:
 	UPROPERTY(Transient)
 	bool bInitialized = false;
 
+	int64 InitialShapeIndex;
+
 	bool bInGenerateCallback = false;
 
 	TQueue<FGenerateQueueItem> GenerateQueue;
@@ -525,6 +538,8 @@ private:
 	TMap<UMaterialInterface*, FString> MaterialIdentifiers;
 	TMap<FString, int32> UniqueMaterialIdentifiers;
 
+	TArray<FInitialShape> GetNeighboringShapes() const;
+	
 	void CalculateRandomSeed();
 
 	void NotifyAttributesChanged();
@@ -534,7 +549,11 @@ private:
 
 #if WITH_EDITOR
 	FDelegateHandle PropertyChangeDelegate;
+
+	FDelegateHandle OnActorMoved;
+	FDelegateHandle OnActorsMoved;
 #endif
 
 	friend class AVitruvioBatchActor;
+
 };

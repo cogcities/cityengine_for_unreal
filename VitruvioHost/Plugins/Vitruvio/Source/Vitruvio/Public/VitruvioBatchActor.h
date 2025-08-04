@@ -19,6 +19,7 @@
 
 #include "VitruvioModule.h"
 #include "GenerateCompletedCallbackProxy.h"
+#include "Util/AttributeConversion.h"
 
 #include "VitruvioBatchActor.generated.h"
 
@@ -62,9 +63,50 @@ public:
 	void Add(UVitruvioComponent* VitruvioComponent);
 	void Remove(UVitruvioComponent* VitruvioComponent);
 	bool Contains(UVitruvioComponent* VitruvioComponent) const;
-	
+
+	template <typename TFilter>
+	TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> GetInitialShapes(TFilter&& Filter, bool bCreateAttributes);
 	TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> GetInitialShapes();
+	
 };
+
+template <typename TFilter>
+TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> UTile::GetInitialShapes(TFilter&& Filter, bool bCreateAttributes)
+{
+	TArray<FInitialShape> InitialShapes;
+	TArray<UVitruvioComponent*> ValidVitruvioComponents;
+	
+	for (UVitruvioComponent* VitruvioComponent : VitruvioComponents)
+	{
+		if (!VitruvioComponent->HasValidInputData() || !Filter(VitruvioComponent))
+		{
+			continue;
+		}
+
+		ValidVitruvioComponents.Add(VitruvioComponent);
+		
+		FInitialShape InitialShape;
+		InitialShape.InitialShapeIndex = VitruvioComponent->GetInitialShapeIndex();
+		InitialShape.Position = VitruvioComponent->GetOwner()->GetTransform().GetLocation();
+		InitialShape.Polygon = VitruvioComponent->InitialShape->GetPolygon();
+		if (bCreateAttributes)
+		{
+			InitialShape.Attributes = Vitruvio::CreateAttributeMap(VitruvioComponent->GetAttributes());
+		}
+
+		InitialShape.RandomSeed = VitruvioComponent->GetRandomSeed();
+		InitialShape.RulePackage = VitruvioComponent->GetRpk();
+
+		InitialShapes.Emplace(MoveTemp(InitialShape));
+	}
+
+	return MakeTuple(MoveTemp(InitialShapes), ValidVitruvioComponents);
+}
+
+inline TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> UTile::GetInitialShapes()
+{
+	return GetInitialShapes([](UVitruvioComponent*) { return true; }, true);
+}
 
 USTRUCT()
 struct FGrid
@@ -93,6 +135,8 @@ struct FGrid
 	
 	void UnmarkAllForGenerate();
 	void UnmarkAllForAttributeEvaluation();
+
+	TArray<FInitialShape> GetNeighboringShapes(const UTile* Tile, const TArray<FInitialShape>& Initial);
 };
 
 struct FBatchGenerateQueueItem
@@ -117,6 +161,9 @@ class VITRUVIO_API AVitruvioBatchActor : public AActor
 public:
 	UPROPERTY(EditAnywhere, Category = "Vitruvio")
 	FIntVector2 GridDimension = {50000, 50000};
+
+	UPROPERTY(EditAnywhere, Category = "Vitruvio")
+	bool bEnableOcclusionQueries = false;
 
 #if WITH_EDITORONLY_DATA
 	UPROPERTY(EditAnywhere, Category = "Vitruvio")

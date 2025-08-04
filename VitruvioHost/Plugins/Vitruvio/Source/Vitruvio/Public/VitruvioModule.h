@@ -98,11 +98,13 @@ public:
 
 struct FInitialShape
 {
-	FVector Offset;
+	int64 InitialShapeIndex;
+	FVector Position;
 	FInitialShapePolygon Polygon;
 	AttributeMapUPtr Attributes;
 	int32 RandomSeed = 0;
 	URulePackage* RulePackage = nullptr;
+	bool bOccluderOnly = false;
 };
 
 using FGenerateResult = TResult<FGenerateResultDescription, FGenerateToken>;
@@ -127,17 +129,21 @@ public:
 	 * \brief Asynchronously evaluates the attributes and generates the models for all given InitialShapes.
 	 *
 	 * \param InitialShapes
+	 * \param bEnableOcclusionQueries
+	 * \param OccluderOnlyShapes
 	 * \return the generated UStaticMesh.
 	 */
-	VITRUVIO_API FBatchGenerateResult BatchGenerateAsync(TArray<FInitialShape> InitialShapes) const;
+	VITRUVIO_API FBatchGenerateResult BatchGenerateAsync(TArray<FInitialShape> InitialShapes, bool bEnableOcclusionQueries, TArray<FInitialShape> OccluderOnlyShapes) const;
 
 	/**
 	 * \brief Generate the models with the given InitialShapes.
 	 *
 	 * \param InitialShapes
+	 * \param bEnableOcclusionQueries
+	 * \param OccluderOnlyShapes
 	 * \return the generated UStaticMesh.
 	 */
-	VITRUVIO_API FGenerateResultDescription BatchGenerate(TArray<FInitialShape> InitialShapes) const;
+	VITRUVIO_API FGenerateResultDescription BatchGenerate(TArray<FInitialShape> InitialShapes, bool bEnableOcclusionQueries, TArray<FInitialShape> OccluderOnlyShapes) const;
 
 	/**
 	 * \brief Asynchronously Evaluates attributes for the given initial shapes and rule packages.
@@ -156,18 +162,22 @@ public:
 	/**
 	 * \brief Asynchronously generate the models with the given InitialShape, RulePackage and Attributes.
 	 *
-	 * \param InitialShape
+	 * \param InitialShapes The initial shapes to generate the models for.
+	 *						Initial shapes after the first one are considered occlusion shapes and will not be generated as models,
+	 *						but only used for occlusion queries.
 	 * \return the generated UStaticMesh.
 	 */
-	VITRUVIO_API FGenerateResult GenerateAsync(FInitialShape InitialShape) const;
+	VITRUVIO_API FGenerateResult GenerateAsync(TArray<FInitialShape> InitialShapes) const;
 
 	/**
 	 * \brief Generate the models with the given InitialShape, RulePackage and Attributes.
 	 *
-	 * \param InitialShape
+	 * \param InitialShapes The initial shapes to generate the models for.
+	 *						Initial shapes after the first one are considered occlusion shapes and will not be generated as models,
+	 *						but only used for occlusion queries.
 	 * \return the generated UStaticMesh.
 	 */
-	VITRUVIO_API FGenerateResultDescription Generate(const FInitialShape& InitialShape) const;
+	VITRUVIO_API FGenerateResultDescription Generate(TArray<FInitialShape> InitialShapes) const;
 
 	/**
 	 * \brief Asynchronously evaluates attributes for the given initial shape and rule package.
@@ -244,6 +254,25 @@ public:
 	 */
 	VITRUVIO_API void UnregisterMesh(UStaticMesh* StaticMesh);
 
+	/**
+	 * Invalidates the occlusion handle of the given initial shape index.
+	 * 
+	 * @param InitialShapeIndex 
+	 */
+	VITRUVIO_API void InvalidateOcclusionHandle(int64 InitialShapeIndex);
+
+	/**
+	 * Invalidates the occlusion handles of the given initial shape indices.
+	 * 
+	 * @param InitialShapeIndices 
+	 */
+	VITRUVIO_API void InvalidateOcclusionHandles(const TArray<int64>& InitialShapeIndices) const;
+
+	/**
+	 * Invalidates all occlusion handles.
+	 */
+	VITRUVIO_API void InvalidateAllOcclusionHandles();
+
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnGenerateCompleted, int);
 
 	DECLARE_MULTICAST_DELEGATE_TwoParams(FOnAllGenerateCompleted, int, int);
@@ -283,7 +312,7 @@ private:
 	void* PrtDllHandle = nullptr;
 	prt::Object const* PrtLibrary = nullptr;
 	CacheObjectUPtr PrtCache;
-
+	
 	TUniquePtr<UnrealLogHandler> LogHandler;
 
 	TAtomic<bool> Initialized = false;
@@ -302,6 +331,11 @@ private:
 	TMap<Vitruvio::FMaterialAttributeContainer, TObjectPtr<UMaterialInstanceDynamic>> MaterialCache;
 	TMap<FString, Vitruvio::FTextureData> TextureCache;
 	FMeshCache MeshCache;
+
+	mutable FCriticalSection OcclusionLock;
+	mutable TMap<int64, prt::OcclusionSet::Handle> OcclusionHandleCache;
+
+	mutable OcclusionSetUPtr OcclusionSet;
 
 	FCriticalSection RegisterMeshLock;
 	TSet<TObjectPtr<UStaticMesh>> RegisteredMeshes;
