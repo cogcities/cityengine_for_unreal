@@ -129,6 +129,8 @@ public:
 	 * \brief Asynchronously evaluates the attributes and generates the models for all given InitialShapes.
 	 *
 	 * \param InitialShapes
+	 * \param bEnableOcclusionQueries
+	 * \param OccluderOnlyShapes
 	 * \return the generated UStaticMesh.
 	 */
 	VITRUVIO_API FBatchGenerateResult BatchGenerateAsync(TArray<FInitialShape> InitialShapes, bool bEnableOcclusionQueries, TArray<FInitialShape> OccluderOnlyShapes) const;
@@ -137,6 +139,8 @@ public:
 	 * \brief Generate the models with the given InitialShapes.
 	 *
 	 * \param InitialShapes
+	 * \param bEnableOcclusionQueries
+	 * \param OccluderOnlyShapes
 	 * \return the generated UStaticMesh.
 	 */
 	VITRUVIO_API FGenerateResultDescription BatchGenerate(TArray<FInitialShape> InitialShapes, bool bEnableOcclusionQueries, TArray<FInitialShape> OccluderOnlyShapes) const;
@@ -158,7 +162,9 @@ public:
 	/**
 	 * \brief Asynchronously generate the models with the given InitialShape, RulePackage and Attributes.
 	 *
-	 * \param InitialShapes
+	 * \param InitialShapes The initial shapes to generate the models for.
+	 *						Initial shapes after the first one are considered occlusion shapes and will not be generated as models,
+	 *						but only used for occlusion queries.
 	 * \return the generated UStaticMesh.
 	 */
 	VITRUVIO_API FGenerateResult GenerateAsync(TArray<FInitialShape> InitialShapes) const;
@@ -166,7 +172,9 @@ public:
 	/**
 	 * \brief Generate the models with the given InitialShape, RulePackage and Attributes.
 	 *
-	 * \param InitialShapes
+	 * \param InitialShapes The initial shapes to generate the models for.
+	 *						Initial shapes after the first one are considered occlusion shapes and will not be generated as models,
+	 *						but only used for occlusion queries.
 	 * \return the generated UStaticMesh.
 	 */
 	VITRUVIO_API FGenerateResultDescription Generate(TArray<FInitialShape> InitialShapes) const;
