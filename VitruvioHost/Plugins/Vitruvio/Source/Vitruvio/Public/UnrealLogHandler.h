@@ -17,6 +17,7 @@
 
 #include "prt/LogHandler.h"
 
+#include "HAL/CriticalSection.h"
 #include "Containers/Array.h"
 #include "Containers/UnrealString.h"
 
