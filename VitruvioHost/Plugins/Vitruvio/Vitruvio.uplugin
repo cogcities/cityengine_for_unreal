@@ -8,7 +8,7 @@
 	"CreatedBy": "Esri",
 	"CreatedByURL": "https://www.esri.com/en-us/home",
 	"DocsURL": "https://github.com/Esri/vitruvio/blob/master/doc/usage.md",
-	"EngineVersion": "5.5",
+	"EngineVersion": "5.6",
 	"CanContainContent": true,
 	"IsBetaVersion": false,
 	"IsExperimentalVersion": false,
