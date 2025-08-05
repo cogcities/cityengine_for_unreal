@@ -25,12 +25,12 @@ using System.Linq;
 public class PRT : ModuleRules
 {
 	private readonly bool Debug;
-	
+
 	// PRT version and toolchain (needs to be correct for download URL)
 	private const int PrtMajor = 3;
-	private const int PrtMinor = 2;
-	private const int PrtBuild = 10650;
-	private const string PrtToolchain = "win10-vc1437-x86_64-rel-opt";
+	private const int PrtMinor = 3;
+	private const int PrtBuild = 11173;
+	private const string PrtToolchain = "win10-vc1438-x86_64-rel-opt";
 
 	private const string PrtCoreDllName = "com.esri.prt.core.dll";
 

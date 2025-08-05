@@ -1,7 +1,7 @@
 {
 	"FileVersion": 3,
 	"Version": 6,
-	"VersionName": "2.3 - 2024.1 (CE SDK v3.2.10650)",
+	"VersionName": "2.4 - 2025.0 (CE SDK v3.3.11173)",
 	"FriendlyName": "ArcGIS CityEngine for Unreal Engine",
 	"Description": "ArcGIS CityEngine for Unreal Engine adds support for CityEngine's procedural runtime (PRT).",
 	"Category": "Misc",
