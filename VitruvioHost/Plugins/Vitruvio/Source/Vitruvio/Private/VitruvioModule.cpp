@@ -749,8 +749,9 @@ FGenerateResultDescription VitruvioModule::Generate(TArray<FInitialShape> Initia
 	bool bInterOcclusion = InitialShapes.Num() > 1;
 	TArray<prt::OcclusionSet::Handle> OcclusionHandles;
 	
+	if (bInterOcclusion)
 	{
-		FScopeLock Lock(&OcclusionLock);
+		OcclusionLock.Lock();
 	
 		TMap<const prt::InitialShape*, int64> OcclusionInitialShapeIndexMap;
 		for (int ShapeIndex = 0; ShapeIndex < InitialShapes.Num(); ++ShapeIndex)
@@ -777,7 +778,8 @@ FGenerateResultDescription VitruvioModule::Generate(TArray<FInitialShape> Initia
 			if (GenerateOccludersStatus != prt::STATUS_OK)
 			{
 				GenerateCallsCounter.Decrement();
-			
+
+				OcclusionLock.Unlock();
 				UE_LOG(LogUnrealPrt, Error, TEXT("PRT generateOccluders failed: %hs"), prt::getStatusDescription(GenerateOccludersStatus))
 				return {};
 			}
@@ -804,6 +806,11 @@ FGenerateResultDescription VitruvioModule::Generate(TArray<FInitialShape> Initia
 	const prt::Status GenerateStatus = generate(Shapes.data(), 1, bInterOcclusion ? OcclusionHandles.GetData() : nullptr, EncoderIds.data(), EncoderIds.size(),
 													 EncoderOptions.data(), OutputHandler.Get(), PrtCache.get(), bInterOcclusion ? OcclusionSet.get() : nullptr);
 
+	if (bInterOcclusion)
+	{
+		OcclusionLock.Unlock();
+	}
+	
 	GenerateCallsCounter.Decrement();
 	if (GenerateStatus != prt::STATUS_OK)
 	{
