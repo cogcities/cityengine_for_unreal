@@ -461,6 +461,18 @@ int64 UVitruvioComponent::GetInitialShapeIndex() const
 	return InitialShapeIndex;
 }
 
+FInitialShape UVitruvioComponent::GetInitialShape() const
+{
+	TMap<FString, TWeakObjectPtr<URuleAttribute>> WeakAttributes;
+
+	for (const auto& Pair : Attributes)
+	{
+		WeakAttributes.Add(Pair.Key, TWeakObjectPtr(Pair.Value));
+	}
+	
+	return FInitialShape { InitialShapeIndex, GetOwner()->GetTransform().GetLocation(), InitialShape->GetPolygon(), WeakAttributes, RandomSeed, Rpk };
+}
+
 TArray<FInitialShape> UVitruvioComponent::GetNeighboringShapes() const
 {
 	TArray<FInitialShape> NeighboringShapes;
@@ -485,8 +497,7 @@ TArray<FInitialShape> UVitruvioComponent::GetNeighboringShapes() const
 		const float Distance = FVector::Dist(OwnerLocation, Actor->GetActorLocation());
 		if (Distance < CVarInterOcclusionNeighborQueryDistance.GetValueOnGameThread())
 		{
-			NeighboringShapes.Add({ VitruvioComponent->GetInitialShapeIndex(), Actor->GetTransform().GetLocation(), VitruvioComponent->InitialShape->GetPolygon(),
-				Vitruvio::CreateAttributeMap(VitruvioComponent->Attributes), VitruvioComponent->RandomSeed, VitruvioComponent->Rpk });
+			NeighboringShapes.Add(VitruvioComponent->GetInitialShape());
 		}
 	}
 
@@ -1225,7 +1236,8 @@ void UVitruvioComponent::Generate(UGenerateCompletedCallbackProxy* CallbackProxy
 	if (InitialShape)
 	{
 		TArray<FInitialShape> Shapes;
-		Shapes.Add( { GetInitialShapeIndex(), GetOwner()->GetTransform().GetLocation(), InitialShape->GetPolygon(), Vitruvio::CreateAttributeMap(Attributes), RandomSeed, Rpk } );
+		
+		Shapes.Add( GetInitialShape() );
 	
 		if (bEnableOcclusionQueries)
 		{
@@ -1459,8 +1471,7 @@ void UVitruvioComponent::EvaluateRuleAttributes(bool ForceRegenerate, UGenerateC
 
 	bAttributesReady = false;
 
-	FAttributeMapResult AttributesResult =
-		VitruvioModule::Get().EvaluateRuleAttributesAsync({ GetInitialShapeIndex(), FVector::ZeroVector, InitialShape->GetPolygon(), Vitruvio::CreateAttributeMap(Attributes), RandomSeed, Rpk});
+	FAttributeMapResult AttributesResult = VitruvioModule::Get().EvaluateRuleAttributesAsync(GetInitialShape());
 
 	EvalAttributesInvalidationToken = AttributesResult.Token;
 

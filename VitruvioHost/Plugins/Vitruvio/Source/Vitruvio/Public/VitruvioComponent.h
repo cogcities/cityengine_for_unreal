@@ -445,6 +445,8 @@ public:
 	/* Returns a unique initial shape index. */;
 	int64 GetInitialShapeIndex() const;
 
+	FInitialShape GetInitialShape() const;
+
 	/**
 	 * Evaluate rule attributes.
 	 *

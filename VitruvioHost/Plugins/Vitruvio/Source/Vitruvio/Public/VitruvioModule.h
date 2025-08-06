@@ -101,7 +101,7 @@ struct FInitialShape
 	int64 InitialShapeIndex;
 	FVector Position;
 	FInitialShapePolygon Polygon;
-	AttributeMapUPtr Attributes;
+	TMap<FString, TWeakObjectPtr<URuleAttribute>> Attributes;
 	int32 RandomSeed = 0;
 	URulePackage* RulePackage = nullptr;
 	bool bOccluderOnly = false;

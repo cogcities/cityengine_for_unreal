@@ -64,46 +64,9 @@ public:
 	void Remove(UVitruvioComponent* VitruvioComponent);
 	bool Contains(UVitruvioComponent* VitruvioComponent) const;
 
-	template <typename TFilter>
-	TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> GetInitialShapes(TFilter&& Filter);
+	TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> GetInitialShapes(const TFunction<bool(UVitruvioComponent*)>& Filter);
 	TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> GetInitialShapes();
-	
 };
-
-template <typename TFilter>
-TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> UTile::GetInitialShapes(TFilter&& Filter)
-{
-	TArray<FInitialShape> InitialShapes;
-	TArray<UVitruvioComponent*> ValidVitruvioComponents;
-	
-	for (UVitruvioComponent* VitruvioComponent : VitruvioComponents)
-	{
-		if (!VitruvioComponent->HasValidInputData() || !Filter(VitruvioComponent))
-		{
-			continue;
-		}
-
-		ValidVitruvioComponents.Add(VitruvioComponent);
-		
-		FInitialShape InitialShape;
-		InitialShape.InitialShapeIndex = VitruvioComponent->GetInitialShapeIndex();
-		InitialShape.Position = VitruvioComponent->GetOwner()->GetTransform().GetLocation();
-		InitialShape.Polygon = VitruvioComponent->InitialShape->GetPolygon();
-		InitialShape.Attributes = Vitruvio::CreateAttributeMap(VitruvioComponent->GetAttributes());
-
-		InitialShape.RandomSeed = VitruvioComponent->GetRandomSeed();
-		InitialShape.RulePackage = VitruvioComponent->GetRpk();
-
-		InitialShapes.Emplace(MoveTemp(InitialShape));
-	}
-
-	return MakeTuple(MoveTemp(InitialShapes), ValidVitruvioComponents);
-}
-
-inline TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> UTile::GetInitialShapes()
-{
-	return GetInitialShapes([](UVitruvioComponent*) { return true; });
-}
 
 USTRUCT()
 struct FGrid
