@@ -486,7 +486,7 @@ TArray<FInitialShape> UVitruvioComponent::GetNeighboringShapes() const
 		if (Distance < CVarInterOcclusionNeighborQueryDistance.GetValueOnGameThread())
 		{
 			NeighboringShapes.Add({ VitruvioComponent->GetInitialShapeIndex(), Actor->GetTransform().GetLocation(), VitruvioComponent->InitialShape->GetPolygon(),
-				Vitruvio::CreateAttributeMap({ }), 0, nullptr });
+				Vitruvio::CreateAttributeMap(VitruvioComponent->Attributes), VitruvioComponent->RandomSeed, VitruvioComponent->Rpk });
 		}
 	}
 

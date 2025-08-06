@@ -65,13 +65,13 @@ public:
 	bool Contains(UVitruvioComponent* VitruvioComponent) const;
 
 	template <typename TFilter>
-	TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> GetInitialShapes(TFilter&& Filter, bool bCreateAttributes);
+	TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> GetInitialShapes(TFilter&& Filter);
 	TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> GetInitialShapes();
 	
 };
 
 template <typename TFilter>
-TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> UTile::GetInitialShapes(TFilter&& Filter, bool bCreateAttributes)
+TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> UTile::GetInitialShapes(TFilter&& Filter)
 {
 	TArray<FInitialShape> InitialShapes;
 	TArray<UVitruvioComponent*> ValidVitruvioComponents;
@@ -89,10 +89,7 @@ TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> UTile::GetInitialShap
 		InitialShape.InitialShapeIndex = VitruvioComponent->GetInitialShapeIndex();
 		InitialShape.Position = VitruvioComponent->GetOwner()->GetTransform().GetLocation();
 		InitialShape.Polygon = VitruvioComponent->InitialShape->GetPolygon();
-		if (bCreateAttributes)
-		{
-			InitialShape.Attributes = Vitruvio::CreateAttributeMap(VitruvioComponent->GetAttributes());
-		}
+		InitialShape.Attributes = Vitruvio::CreateAttributeMap(VitruvioComponent->GetAttributes());
 
 		InitialShape.RandomSeed = VitruvioComponent->GetRandomSeed();
 		InitialShape.RulePackage = VitruvioComponent->GetRpk();
@@ -105,7 +102,7 @@ TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> UTile::GetInitialShap
 
 inline TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> UTile::GetInitialShapes()
 {
-	return GetInitialShapes([](UVitruvioComponent*) { return true; }, true);
+	return GetInitialShapes([](UVitruvioComponent*) { return true; });
 }
 
 USTRUCT()

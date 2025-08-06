@@ -243,7 +243,7 @@ TArray<FInitialShape> FGrid::GetNeighboringShapes(const UTile* Tile, const TArra
 			}
 
 			return false;
-		}, false);
+		});
 
 		for (FInitialShape& NeighborShape : NeighborInitialShapes)
 		{
