@@ -480,6 +480,19 @@ AttributeMapUPtr CreateAttributeMap(const TMap<FString, URuleAttribute*>& Attrib
 	return AttributeMapUPtr(AttributeMapBuilder->createAttributeMap(), PRTDestroyer());
 }
 
+AttributeMapUPtr CreateAttributeMap(const TMap<FString, TWeakObjectPtr<URuleAttribute>>& WeakAttributes)
+{
+	TMap<FString, URuleAttribute*> Attributes;
+	for (const auto& [Key, Attribute] : WeakAttributes)
+	{
+		if (Attribute.IsValid())
+		{
+			Attributes.Add(Key, Attribute.Get());
+		}
+	}
+	return CreateAttributeMap(Attributes);
+}
+
 URuleAttribute* CreateAttribute(const FString& Key, const FString& Value)
 {
 	const FString Trimmed = Value.TrimStartAndEnd();

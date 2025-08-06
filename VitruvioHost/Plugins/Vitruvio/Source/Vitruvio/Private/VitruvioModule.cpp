@@ -31,6 +31,7 @@
 #include "Modules/ModuleManager.h"
 
 #include "UObject/UObjectBaseUtility.h"
+#include "Util/AttributeConversion.h"
 
 #define LOCTEXT_NAMESPACE "VitruvioModule"
 
@@ -230,7 +231,8 @@ AttributeMapUPtr EvaluateRuleAttributes(const std::wstring& RuleFile, const std:
 
 	SetInitialShapeGeometry(InitialShapeBuilder, InitialShape);
 
-	InitialShapeBuilder->setAttributes(RuleFile.c_str(), StartRule.c_str(), InitialShape.RandomSeed, L"", InitialShape.Attributes.get(), ResolveMapPtr.get());
+	AttributeMapUPtr Attributes = Vitruvio::CreateAttributeMap(InitialShape.Attributes);
+	InitialShapeBuilder->setAttributes(RuleFile.c_str(), StartRule.c_str(), InitialShape.RandomSeed, L"", Attributes.get(), ResolveMapPtr.get());
 
 	const InitialShapeUPtr Shape(InitialShapeBuilder->createInitialShapeAndReset());
 	const InitialShapeNOPtrVector InitialShapes = {Shape.get()};
@@ -485,7 +487,8 @@ FGenerateResultDescription VitruvioModule::BatchGenerate(TArray<FInitialShape> I
 	};
 	
 	InitialShapeUPtrVector InitialShapeUPtrs;
-
+	AttributeMapVector AttributeMaps;
+	
 	TMap<int64, const prt::InitialShape*> InitialShapeByIndex;
 	TMap<const prt::InitialShape*, int64> IndexByInitialShape;
 
@@ -493,13 +496,16 @@ FGenerateResultDescription VitruvioModule::BatchGenerate(TArray<FInitialShape> I
 	{
 		InitialShapeBuilderUPtr InitialShapeBuilder(prt::InitialShapeBuilder::create());
 		SetInitialShapeGeometry(InitialShapeBuilder, InitialShape);
+
+		AttributeMapUPtr Attributes = Vitruvio::CreateAttributeMap(InitialShape.Attributes);
 		InitialShapeBuilder->setAttributes(*StartRuleInfo.RuleFile, *StartRuleInfo.StartRule, InitialShape.RandomSeed, L"",
-			InitialShape.Attributes.get(), StartRuleInfo.ResolveMap.get());
+			Attributes.get(), StartRuleInfo.ResolveMap.get());
 		InitialShapeUPtr Shape(InitialShapeBuilder->createInitialShape());
 
 		InitialShapeByIndex.Add(InitialShape.InitialShapeIndex, Shape.get());
 		IndexByInitialShape.Add(Shape.get(), InitialShape.InitialShapeIndex);
 		InitialShapeUPtrs.push_back(std::move(Shape));
+		AttributeMaps.push_back(std::move(Attributes));
 	});
 
 	TArray<FAttributeMapPtr> EvaluatedAttributes;
@@ -560,7 +566,6 @@ FGenerateResultDescription VitruvioModule::BatchGenerate(TArray<FInitialShape> I
 		OcclusionLock.Lock();
 					
 		InvalidateOcclusionHandles(InitialShapeIndices);
-		InvalidateOcclusionHandles(OccluderShapeIndices);
 
 		ForeachInitialShape(true, false, [&]
 			(int32, const FInitialShape& InitialShape, const FStartRuleInfo& StartRuleInfo)
@@ -568,13 +573,17 @@ FGenerateResultDescription VitruvioModule::BatchGenerate(TArray<FInitialShape> I
 			InitialShapeBuilderUPtr InitialShapeBuilder(prt::InitialShapeBuilder::create());
 			AttributeMapBuilderUPtr AttributeMapBuilder(prt::AttributeMapBuilder::create());
 			SetInitialShapeGeometry(InitialShapeBuilder, InitialShape);
+			
+			AttributeMapUPtr Attributes = Vitruvio::CreateAttributeMap(InitialShape.Attributes);
 			InitialShapeBuilder->setAttributes(*StartRuleInfo.RuleFile, *StartRuleInfo.StartRule, InitialShape.RandomSeed, L"",
-				AttributeMapBuilder->createAttributeMap(), StartRuleInfo.ResolveMap.get());
+				Attributes.get(), StartRuleInfo.ResolveMap.get());
+			
 			InitialShapeUPtr Shape(InitialShapeBuilder->createInitialShape());
 
 			InitialShapeByIndex.Add(InitialShape.InitialShapeIndex, Shape.get());
 			IndexByInitialShape.Add(Shape.get(), InitialShape.InitialShapeIndex);
 			InitialShapeUPtrs.push_back(std::move(Shape));
+			AttributeMaps.push_back(std::move(Attributes));
 		});
 			
 		if (!InitialShapeByIndex.IsEmpty())
@@ -731,7 +740,8 @@ FGenerateResultDescription VitruvioModule::Generate(TArray<FInitialShape> Initia
 	const std::vector<const wchar_t*> EncoderIds = {UNREAL_GEOMETRY_ENCODER_ID};
 	const AttributeMapUPtr UnrealEncoderOptions(prtu::createValidatedOptions(UNREAL_GEOMETRY_ENCODER_ID));
 	const AttributeMapNOPtrVector EncoderOptions = {UnrealEncoderOptions.get()};
-
+	
+	AttributeMapVector AttributeMaps;
 	InitialShapeNOPtrVector Shapes = {};
 	TArray<InitialShapeUPtr> ShapesPointers;
 
@@ -740,18 +750,21 @@ FGenerateResultDescription VitruvioModule::Generate(TArray<FInitialShape> Initia
 	{
 		SetInitialShapeGeometry(InitialShapeBuilder, InitialShape);
 
-		InitialShapeBuilder->setAttributes(RuleFile.c_str(), StartRule.c_str(), InitialShape.RandomSeed, L"", InitialShape.Attributes.get(), ResolveMap.get());
+		AttributeMapUPtr Attributes = Vitruvio::CreateAttributeMap(InitialShape.Attributes);
+		InitialShapeBuilder->setAttributes(RuleFile.c_str(), StartRule.c_str(), InitialShape.RandomSeed, L"", Attributes.get(), ResolveMap.get());
 
 		InitialShapeUPtr InitialShapePtr(InitialShapeBuilder->createInitialShapeAndReset());
 		Shapes.push_back(InitialShapePtr.get());
 		ShapesPointers.Add(MoveTemp(InitialShapePtr));
+		AttributeMaps.push_back(MoveTemp(Attributes));
 	}
 
 	bool bInterOcclusion = InitialShapes.Num() > 1;
 	TArray<prt::OcclusionSet::Handle> OcclusionHandles;
 	
+	if (bInterOcclusion)
 	{
-		FScopeLock Lock(&OcclusionLock);
+		OcclusionLock.Lock();
 	
 		TMap<const prt::InitialShape*, int64> OcclusionInitialShapeIndexMap;
 		for (int ShapeIndex = 0; ShapeIndex < InitialShapes.Num(); ++ShapeIndex)
@@ -778,7 +791,8 @@ FGenerateResultDescription VitruvioModule::Generate(TArray<FInitialShape> Initia
 			if (GenerateOccludersStatus != prt::STATUS_OK)
 			{
 				GenerateCallsCounter.Decrement();
-			
+
+				OcclusionLock.Unlock();
 				UE_LOG(LogUnrealPrt, Error, TEXT("PRT generateOccluders failed: %hs"), prt::getStatusDescription(GenerateOccludersStatus))
 				return {};
 			}
@@ -805,6 +819,11 @@ FGenerateResultDescription VitruvioModule::Generate(TArray<FInitialShape> Initia
 	const prt::Status GenerateStatus = generate(Shapes.data(), 1, bInterOcclusion ? OcclusionHandles.GetData() : nullptr, EncoderIds.data(), EncoderIds.size(),
 													 EncoderOptions.data(), OutputHandler.Get(), PrtCache.get(), bInterOcclusion ? OcclusionSet.get() : nullptr);
 
+	if (bInterOcclusion)
+	{
+		OcclusionLock.Unlock();
+	}
+	
 	GenerateCallsCounter.Decrement();
 	if (GenerateStatus != prt::STATUS_OK)
 	{
@@ -916,17 +935,20 @@ TArray<FAttributeMapPtr> VitruvioModule::BatchEvaluateRuleAttributes(TArray<FIni
 	TArray<InitialShapeBuilderUPtr> InitialShapeBuilders;
 	InitialShapeUPtrVector InitialShapeUPtrs;
 	InitialShapeNOPtrVector InitialShapePtrs;
-
+	AttributeMapVector AttributeMaps;
+	
 	ForeachInitialShape([&](int32 InitialShapeIndex, const FInitialShape& InitialShape, const FStartRuleInfo& StartRuleInfo)
 	{
 		InitialShapeBuilderUPtr InitialShapeBuilder(prt::InitialShapeBuilder::create());
 		SetInitialShapeGeometry(InitialShapeBuilder, InitialShape);
+
+		AttributeMapUPtr Attributes = Vitruvio::CreateAttributeMap(InitialShape.Attributes);
 		InitialShapeBuilder->setAttributes(*StartRuleInfo.RuleFile, *StartRuleInfo.StartRule, InitialShape.RandomSeed, L"",
-			InitialShape.Attributes.get(), StartRuleInfo.ResolveMap.get());
+			Attributes.get(), StartRuleInfo.ResolveMap.get());
 		InitialShapeUPtr Shape(InitialShapeBuilder->createInitialShape());
 		InitialShapePtrs.push_back(Shape.get());
 		InitialShapeUPtrs.push_back(std::move(Shape));
-
+		AttributeMaps.push_back(std::move(Attributes));
 		InitialShapeBuilders.Add(MoveTemp(InitialShapeBuilder));
 	});
 

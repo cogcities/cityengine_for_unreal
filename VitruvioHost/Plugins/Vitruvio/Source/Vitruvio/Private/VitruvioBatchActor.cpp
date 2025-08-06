@@ -67,6 +67,30 @@ bool UTile::Contains(UVitruvioComponent* VitruvioComponent) const
 	return VitruvioComponents.Contains(VitruvioComponent);
 }
 
+TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> UTile::GetInitialShapes(const TFunction<bool(UVitruvioComponent*)>& Filter)
+{
+	TArray<FInitialShape> InitialShapes;
+	TArray<UVitruvioComponent*> ValidVitruvioComponents;
+	
+	for (UVitruvioComponent* VitruvioComponent : VitruvioComponents)
+	{
+		if (!VitruvioComponent->HasValidInputData() || !Filter(VitruvioComponent))
+		{
+			continue;
+		}
+
+		ValidVitruvioComponents.Add(VitruvioComponent);
+		InitialShapes.Add(VitruvioComponent->GetInitialShape());
+	}
+
+	return MakeTuple(MoveTemp(InitialShapes), ValidVitruvioComponents);
+}
+
+TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> UTile::GetInitialShapes()
+{
+	return GetInitialShapes([](UVitruvioComponent*) { return true; });
+}
+
 void FGrid::MarkForAttributeEvaluation(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy)
 {
 	if (UTile** FoundTile = TilesByComponent.Find(VitruvioComponent))
@@ -243,7 +267,7 @@ TArray<FInitialShape> FGrid::GetNeighboringShapes(const UTile* Tile, const TArra
 			}
 
 			return false;
-		}, false);
+		});
 
 		for (FInitialShape& NeighborShape : NeighborInitialShapes)
 		{
