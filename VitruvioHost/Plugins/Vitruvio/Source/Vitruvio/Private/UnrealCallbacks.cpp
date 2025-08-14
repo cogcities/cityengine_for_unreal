@@ -371,7 +371,7 @@ void UnrealCallbacks::addInstance(int32_t prototypeId, const wchar_t* meshId, co
 	// https://stackoverflow.com/questions/16099979/can-i-switch-x-y-z-in-a-quaternion)
 	const FQuat CERotation = FQuat(Rotation.X, Rotation.Z, Rotation.Y, Rotation.W);
 	const FVector CEScale = FVector(Scale.X, Scale.Z, Scale.Y);
-	const FVector CETranslation = FVector(Translation.X, Translation.Z, Translation.Y) * PRT_TO_UE_SCALE;
+	const FVector CETranslation = FVector(Translation.X, Translation.Z, Translation.Y) * PRT_TO_UE_SCALE - Offset;
 
 	if (!InstanceMeshes.Contains(meshId))
 	{
