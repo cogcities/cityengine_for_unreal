@@ -15,11 +15,9 @@
 
 #include "VitruvioBatchActor.h"
 
-#include "AttributeConversion.h"
 #include "Materials/Material.h"
 #include "Runtime/CoreUObject/Public/UObject/ConstructorHelpers.h"
 #include "GenerateCompletedCallbackProxy.h"
-#include "PhysicsEngine/BodySetup.h"
 
 void UTile::MarkForAttributeEvaluation(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy)
 {
@@ -69,31 +67,28 @@ bool UTile::Contains(UVitruvioComponent* VitruvioComponent) const
 	return VitruvioComponents.Contains(VitruvioComponent);
 }
 
-TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> UTile::GetInitialShapes()
+TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> UTile::GetInitialShapes(const TFunction<bool(UVitruvioComponent*)>& Filter)
 {
 	TArray<FInitialShape> InitialShapes;
 	TArray<UVitruvioComponent*> ValidVitruvioComponents;
 	
 	for (UVitruvioComponent* VitruvioComponent : VitruvioComponents)
 	{
-		if (!VitruvioComponent->HasValidInputData())
+		if (!VitruvioComponent->HasValidInputData() || !Filter(VitruvioComponent))
 		{
 			continue;
 		}
 
 		ValidVitruvioComponents.Add(VitruvioComponent);
-		
-		FInitialShape InitialShape;
-		InitialShape.Offset = VitruvioComponent->GetOwner()->GetTransform().GetLocation();
-		InitialShape.Polygon = VitruvioComponent->InitialShape->GetPolygon();
-		InitialShape.Attributes = Vitruvio::CreateAttributeMap(VitruvioComponent->GetAttributes());
-		InitialShape.RandomSeed = VitruvioComponent->GetRandomSeed();
-		InitialShape.RulePackage = VitruvioComponent->GetRpk();
-
-		InitialShapes.Emplace(MoveTemp(InitialShape));
+		InitialShapes.Add(VitruvioComponent->GetInitialShape());
 	}
 
 	return MakeTuple(MoveTemp(InitialShapes), ValidVitruvioComponents);
+}
+
+TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> UTile::GetInitialShapes()
+{
+	return GetInitialShapes([](UVitruvioComponent*) { return true; });
 }
 
 void FGrid::MarkForAttributeEvaluation(UVitruvioComponent* VitruvioComponent, UGenerateCompletedCallbackProxy* CallbackProxy)
@@ -241,6 +236,50 @@ void FGrid::UnmarkAllForAttributeEvaluation()
 	}
 }
 
+TArray<FInitialShape> FGrid::GetNeighboringShapes(const UTile* Tile, const TArray<FInitialShape>& InitialShapes)
+{
+	TArray<FInitialShape> NeighboringShapes;
+	
+	const TArray Directions = {
+		FIntPoint(-1, 0), FIntPoint(1, 0), FIntPoint(0, -1), FIntPoint(0, 1),
+		FIntPoint(-1, -1), FIntPoint(-1, 1), FIntPoint(1, -1), FIntPoint(1, 1)
+	};
+
+	for (const FIntPoint& Dir : Directions)
+	{
+		FIntPoint NeighborPos = Tile->Location + Dir;
+		UTile** NeighborTilePtr = Tiles.Find(NeighborPos);
+		if (!NeighborTilePtr)
+		{
+			continue;
+		}
+			
+		UTile* NeighborTile = *NeighborTilePtr;
+		auto [NeighborInitialShapes, _] = NeighborTile->GetInitialShapes([&InitialShapes](UVitruvioComponent* VitruvioComponent)
+		{
+			FVector Position = VitruvioComponent->GetOwner()->GetTransform().GetLocation();
+			for (const FInitialShape& InputShape : InitialShapes)
+			{
+				if (FVector::Dist(Position, InputShape.Position) < CVarInterOcclusionNeighborQueryDistance.GetValueOnAnyThread())
+				{
+					return true;
+				}
+			}
+
+			return false;
+		});
+
+		for (FInitialShape& NeighborShape : NeighborInitialShapes)
+		{
+			NeighborShape.bOccluderOnly = true;
+		}
+		
+		NeighboringShapes.Append(MoveTemp(NeighborInitialShapes));
+	}
+
+	return NeighboringShapes;
+}
+
 AVitruvioBatchActor::AVitruvioBatchActor()
 {
 	SetTickGroup(TG_LastDemotable);
@@ -268,6 +307,8 @@ FIntPoint AVitruvioBatchActor::GetPosition(const UVitruvioComponent* VitruvioCom
 	const int PositionY = static_cast<int>(FMath::Floor(Position.Y / GridDimension.Y));
 	return FIntPoint {PositionX, PositionY};
 }
+
+
 
 void AVitruvioBatchActor::ProcessTiles()
 {
@@ -312,8 +353,14 @@ void AVitruvioBatchActor::ProcessTiles()
 			{
 				Tile->GenerateToken->Invalidate();
 			}
+
+			TArray<FInitialShape> OccluderOnlyShapes;
+			if (bEnableOcclusionQueries)
+			{
+				OccluderOnlyShapes = Grid.GetNeighboringShapes(Tile, InitialShapes);
+			}
 			
-			FBatchGenerateResult GenerateResult = VitruvioModule::Get().BatchGenerateAsync(MoveTemp(InitialShapes));
+			FBatchGenerateResult GenerateResult = VitruvioModule::Get().BatchGenerateAsync(MoveTemp(InitialShapes), bEnableOcclusionQueries, MoveTemp(OccluderOnlyShapes));
 			
 			Tile->GenerateToken = GenerateResult.Token;
 			Tile->bIsGenerating = true;
@@ -394,12 +441,15 @@ void AVitruvioBatchActor::ProcessGenerateQueue()
 
 		ProcessGenerateQueueCriticalSection.Unlock();
 
-		for (int ComponentIndex = 0; ComponentIndex < Item.VitruvioComponents.Num(); ++ComponentIndex)
+		if (Item.GenerateResultDescription.EvaluatedAttributes.Num() ==  Item.VitruvioComponents.Num())
 		{
-			UVitruvioComponent* VitruvioComponent = Item.VitruvioComponents[ComponentIndex];
-			Item.GenerateResultDescription.EvaluatedAttributes[ComponentIndex]->UpdateUnrealAttributeMap(VitruvioComponent->Attributes, VitruvioComponent);
-			VitruvioComponent->bAttributesReady = true;
-			VitruvioComponent->NotifyAttributesChanged();
+			for (int ComponentIndex = 0; ComponentIndex < Item.VitruvioComponents.Num(); ++ComponentIndex)
+			{
+				UVitruvioComponent* VitruvioComponent = Item.VitruvioComponents[ComponentIndex];
+				Item.GenerateResultDescription.EvaluatedAttributes[ComponentIndex]->UpdateUnrealAttributeMap(VitruvioComponent->Attributes, VitruvioComponent);
+				VitruvioComponent->bAttributesReady = true;
+				VitruvioComponent->NotifyAttributesChanged();
+			}
 		}
 
 		UGeneratedModelStaticMeshComponent* VitruvioModelComponent = Item.Tile->GeneratedModelComponent;
@@ -618,7 +668,8 @@ void AVitruvioBatchActor::PostEditChangeProperty(FPropertyChangedEvent& Property
 	}
 	
 	if (PropertyChangedEvent.Property->GetFName() == GET_MEMBER_NAME_CHECKED(UVitruvioComponent, MaterialReplacement) ||
-		PropertyChangedEvent.Property->GetFName() == GET_MEMBER_NAME_CHECKED(UVitruvioComponent, InstanceReplacement))
+		PropertyChangedEvent.Property->GetFName() == GET_MEMBER_NAME_CHECKED(UVitruvioComponent, InstanceReplacement) ||
+		PropertyChangedEvent.MemberProperty->GetFName() == GET_MEMBER_NAME_CHECKED(AVitruvioBatchActor, bEnableOcclusionQueries))
 	{
 		GenerateAll();
 	}

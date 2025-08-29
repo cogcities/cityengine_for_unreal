@@ -104,7 +104,7 @@ TMap<FString, double> CreateAvailableUVSetMaterialParameterMap(uint32_t const* c
 }
 
 FModelDescription ConvertMesh(const double* vtx, size_t vtxSize, const double* nrm, size_t nrmSize, const uint32_t* faceVertexCounts, size_t faceVertexCountsSize, const uint32_t* vertexIndices, size_t vertexIndicesSize, const uint32_t* normalIndices, size_t normalIndicesSize,
-	double const* const* uvs, uint32_t const* const* uvCounts, uint32_t const* const* uvIndices, size_t uvSets, const uint32_t* faceRanges, size_t faceRangesSize, const prt::AttributeMap** materials)
+	double const* const* uvs, uint32_t const* const* uvCounts, uint32_t const* const* uvIndices, size_t uvSets, const uint32_t* faceRanges, size_t faceRangesSize, const prt::AttributeMap** materials, const FVector3f& VertexOffset = FVector3f::ZeroVector)
 {
 	FModelDescription ModelDescription;
     FStaticMeshAttributes Attributes(ModelDescription.MeshDescription);
@@ -118,7 +118,7 @@ FModelDescription ConvertMesh(const double* vtx, size_t vtxSize, const double* n
 	for (size_t VertexIndex = 0; VertexIndex < vtxSize; VertexIndex += 3)
 	{
 		const FVertexID VertexID = ModelDescription.MeshDescription.CreateVertex();
-		VertexPositions[VertexID] = FVector3f(vtx[VertexIndex], vtx[VertexIndex + 2], vtx[VertexIndex + 1]) * PRT_TO_UE_SCALE;
+		VertexPositions[VertexID] = FVector3f(vtx[VertexIndex], vtx[VertexIndex + 2], vtx[VertexIndex + 1]) * PRT_TO_UE_SCALE - VertexOffset;
 	}
 	
 	size_t BaseVertexIndex = 0;
@@ -302,7 +302,7 @@ void UnrealCallbacks::addMesh(const wchar_t* name, const wchar_t* meshId, int32_
 	if (prototypeId == NoPrototypeIndex)
 	{
 		ModelDescription = ConvertMesh(vtx, vtxSize, nrm, nrmSize, faceVertexCounts, faceVertexCountsSize, vertexIndices, vertexIndicesSize,
-			normalIndices, normalIndicesSize, uvs, uvCounts, uvIndices, uvSets, faceRanges, faceRangesSize, materials);
+			normalIndices, normalIndicesSize, uvs, uvCounts, uvIndices, uvSets, faceRanges, faceRangesSize, materials, FVector3f(Offset));
 	}
 	else
 	{
@@ -371,7 +371,7 @@ void UnrealCallbacks::addInstance(int32_t prototypeId, const wchar_t* meshId, co
 	// https://stackoverflow.com/questions/16099979/can-i-switch-x-y-z-in-a-quaternion)
 	const FQuat CERotation = FQuat(Rotation.X, Rotation.Z, Rotation.Y, Rotation.W);
 	const FVector CEScale = FVector(Scale.X, Scale.Z, Scale.Y);
-	const FVector CETranslation = FVector(Translation.X, Translation.Z, Translation.Y) * PRT_TO_UE_SCALE;
+	const FVector CETranslation = FVector(Translation.X, Translation.Z, Translation.Y) * PRT_TO_UE_SCALE - Offset;
 
 	if (!InstanceMeshes.Contains(meshId))
 	{

@@ -19,6 +19,7 @@
 
 #include "VitruvioModule.h"
 #include "GenerateCompletedCallbackProxy.h"
+#include "Util/AttributeConversion.h"
 
 #include "VitruvioBatchActor.generated.h"
 
@@ -62,7 +63,8 @@ public:
 	void Add(UVitruvioComponent* VitruvioComponent);
 	void Remove(UVitruvioComponent* VitruvioComponent);
 	bool Contains(UVitruvioComponent* VitruvioComponent) const;
-	
+
+	TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> GetInitialShapes(const TFunction<bool(UVitruvioComponent*)>& Filter);
 	TTuple<TArray<FInitialShape>, TArray<UVitruvioComponent*>> GetInitialShapes();
 };
 
@@ -93,6 +95,8 @@ struct FGrid
 	
 	void UnmarkAllForGenerate();
 	void UnmarkAllForAttributeEvaluation();
+
+	TArray<FInitialShape> GetNeighboringShapes(const UTile* Tile, const TArray<FInitialShape>& Initial);
 };
 
 struct FBatchGenerateQueueItem
@@ -117,6 +121,9 @@ class VITRUVIO_API AVitruvioBatchActor : public AActor
 public:
 	UPROPERTY(EditAnywhere, Category = "Vitruvio")
 	FIntVector2 GridDimension = {50000, 50000};
+
+	UPROPERTY(EditAnywhere, Category = "Vitruvio")
+	bool bEnableOcclusionQueries = false;
 
 #if WITH_EDITORONLY_DATA
 	UPROPERTY(EditAnywhere, Category = "Vitruvio")

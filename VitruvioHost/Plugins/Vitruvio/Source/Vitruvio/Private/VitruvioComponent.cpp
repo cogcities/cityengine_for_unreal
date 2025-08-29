@@ -15,7 +15,8 @@
 
 #include "VitruvioComponent.h"
 
-#include "AttributeConversion.h"
+#include "Util/AttributeConversion.h"
+#include "EngineUtils.h"
 #include "GenerateCompletedCallbackProxy.h"
 #include "GeneratedModelHISMComponent.h"
 #include "GeneratedModelStaticMeshComponent.h"
@@ -29,7 +30,6 @@
 #include "Engine/CollisionProfile.h"
 #include "PRTUtils.h"
 #include "VitruvioBatchSubsystem.h"
-#include "PhysicsEngine/BodySetup.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/World.h"
 #include "Materials/Material.h"
@@ -37,8 +37,12 @@
 
 DEFINE_LOG_CATEGORY(LogVitruvioComponent);
 
+TAutoConsoleVariable<float> CVarInterOcclusionNeighborQueryDistance(TEXT("Esri.Vitruvio.InterOcclusionNeighborQueryDistance"), 10000.0f, TEXT("The distance in cm to query for inter-occlusion neighbors."));
+
 namespace
 {
+
+int64 InitialShapeCounter;
 
 bool ToBool(const FString& Value)
 {
@@ -448,6 +452,56 @@ UVitruvioComponent::UVitruvioComponent()
 
 	PrimaryComponentTick.bCanEverTick = true;
 	bTickInEditor = true;
+
+	InitialShapeIndex = InitialShapeCounter++;
+}
+
+int64 UVitruvioComponent::GetInitialShapeIndex() const
+{
+	return InitialShapeIndex;
+}
+
+FInitialShape UVitruvioComponent::GetInitialShape() const
+{
+	TMap<FString, TWeakObjectPtr<URuleAttribute>> WeakAttributes;
+
+	for (const auto& Pair : Attributes)
+	{
+		WeakAttributes.Add(Pair.Key, TWeakObjectPtr(Pair.Value));
+	}
+	
+	return FInitialShape { InitialShapeIndex, GetOwner()->GetTransform().GetLocation(), InitialShape->GetPolygon(), WeakAttributes, RandomSeed, Rpk };
+}
+
+TArray<FInitialShape> UVitruvioComponent::GetNeighboringShapes() const
+{
+	TArray<FInitialShape> NeighboringShapes;
+
+	const FVector OwnerLocation = GetOwner()->GetActorLocation();
+
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		AActor* Actor = *It;
+
+		if (Actor == GetOwner())
+		{
+			continue;
+		}
+
+		UVitruvioComponent* VitruvioComponent = Actor->FindComponentByClass<UVitruvioComponent>();
+		if (!VitruvioComponent || !VitruvioComponent->bEnableOcclusionQueries  || !VitruvioComponent->InitialShape || !VitruvioComponent->InitialShape->IsValid())
+		{
+			continue;
+		}
+
+		const float Distance = FVector::Dist(OwnerLocation, Actor->GetActorLocation());
+		if (Distance < CVarInterOcclusionNeighborQueryDistance.GetValueOnGameThread())
+		{
+			NeighboringShapes.Add(VitruvioComponent->GetInitialShape());
+		}
+	}
+
+	return NeighboringShapes;
 }
 
 void UVitruvioComponent::CalculateRandomSeed()
@@ -790,6 +844,36 @@ void UVitruvioComponent::Initialize()
 	{
 		PropertyChangeDelegate = FCoreUObjectDelegates::OnObjectPropertyChanged.AddUObject(this, &UVitruvioComponent::OnPropertyChanged);
 	}
+	
+	auto ActorMoved = [this](const AActor* Actor)
+	{
+		if (Actor != GetOwner())
+		{
+			return;
+		}
+		
+		if (UVitruvioComponent* VitruvioComponent = Actor->FindComponentByClass<UVitruvioComponent>())
+		{
+			if (!VitruvioComponent->IsBatchGenerated() && VitruvioComponent->bEnableOcclusionQueries && VitruvioComponent->GenerateAutomatically)
+			{
+				VitruvioComponent->Generate();
+			}
+		}
+	};
+	
+	OnActorMoved = GEngine->OnActorMoved().AddLambda([ActorMoved](AActor* Actor)
+	{
+		ActorMoved(Actor);
+	});
+
+	OnActorsMoved = GEngine->OnActorsMoved().AddLambda([ActorMoved](const TArray<AActor*>& Actors)
+	{
+		for (const AActor* Actor : Actors)
+		{
+			ActorMoved(Actor);
+		}
+	});
+
 #endif
 
 	LoadInitialShape();
@@ -1107,15 +1191,25 @@ void UVitruvioComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
 		EvalAttributesInvalidationToken->Invalidate();
 	}
 
+	VitruvioModule::Get().InvalidateOcclusionHandle(InitialShapeIndex);
+
 #if WITH_EDITOR
 	FCoreUObjectDelegates::OnObjectPropertyChanged.Remove(PropertyChangeDelegate);
 	PropertyChangeDelegate.Reset();
+
+	if (GEngine)
+	{
+		GEngine->OnActorMoved().Remove(OnActorMoved);
+		GEngine->OnActorsMoved().Remove(OnActorsMoved);
+	}
 #endif
 }
 
 void UVitruvioComponent::Generate(UGenerateCompletedCallbackProxy* CallbackProxy, const FGenerateOptions& GenerateOptions)
 {
 	Initialize();
+	
+	VitruvioModule::Get().InvalidateOcclusionHandle(InitialShapeIndex);
 
 	// Since we can not abort an ongoing generate call from PRT, we invalidate the result and regenerate after the current generate call has
 	// completed.
@@ -1141,8 +1235,16 @@ void UVitruvioComponent::Generate(UGenerateCompletedCallbackProxy* CallbackProxy
 
 	if (InitialShape)
 	{
-		FGenerateResult GenerateResult =
-			VitruvioModule::Get().GenerateAsync({ FVector::ZeroVector, InitialShape->GetPolygon(), Vitruvio::CreateAttributeMap(Attributes), RandomSeed, Rpk});
+		TArray<FInitialShape> Shapes;
+		
+		Shapes.Add( GetInitialShape() );
+	
+		if (bEnableOcclusionQueries)
+		{
+			Shapes.Append(GetNeighboringShapes());
+		}
+		
+		FGenerateResult GenerateResult = VitruvioModule::Get().GenerateAsync(MoveTemp(Shapes));
 
 		GenerateToken = GenerateResult.Token;
 
@@ -1245,6 +1347,11 @@ void UVitruvioComponent::OnPropertyChanged(UObject* Object, FPropertyChangedEven
 		}
 
 		if (PropertyChangedEvent.Property->GetFName() == GET_MEMBER_NAME_CHECKED(UVitruvioComponent, GenerateAutomatically))
+		{
+			bComponentPropertyChanged = true;
+		}
+
+		if (PropertyChangedEvent.Property->GetFName() == GET_MEMBER_NAME_CHECKED(UVitruvioComponent, bEnableOcclusionQueries))
 		{
 			bComponentPropertyChanged = true;
 		}
@@ -1364,8 +1471,7 @@ void UVitruvioComponent::EvaluateRuleAttributes(bool ForceRegenerate, UGenerateC
 
 	bAttributesReady = false;
 
-	FAttributeMapResult AttributesResult =
-		VitruvioModule::Get().EvaluateRuleAttributesAsync({ FVector::ZeroVector, InitialShape->GetPolygon(), Vitruvio::CreateAttributeMap(Attributes), RandomSeed, Rpk});
+	FAttributeMapResult AttributesResult = VitruvioModule::Get().EvaluateRuleAttributesAsync(GetInitialShape());
 
 	EvalAttributesInvalidationToken = AttributesResult.Token;
 
