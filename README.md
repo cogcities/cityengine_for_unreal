@@ -1,4 +1,15 @@
-# ArcGIS CityEngine for Unreal Engine
+# ArcGIS CityEngine for Unreal Engine - Cognitive Cities Edition
+
+## 🏙️ Distributed Architecture for Cognitive Cities
+
+This repository extends [ArcGIS CityEngine for Unreal Engine](https://www.unrealengine.com/en-US/unreal-engine-5) to support the **distributed architecture of cognitive cities**. While maintaining full compatibility with the original CityEngine UE5 plugin for procedural building generation, this cognitive cities edition adds advanced capabilities for:
+
+- **Distributed Urban Intelligence**: Neural networks for city-wide cognitive processing
+- **Inter-Organizational Communication**: Protocols for cogpilot ↔ cogcities coordination  
+- **Living Architecture**: Self-evolving urban systems with emergent behaviors
+- **Cognitive Ecology**: Fractal organizational patterns for scalable city intelligence
+
+### Original CityEngine Functionality
 
 ArcGIS CityEngine for Unreal Engine is an [Unreal Engine 5](https://www.unrealengine.com/en-US/unreal-engine-5) (UE5) plugin which enables the use of ArcGIS CityEngine shape grammar rules in UE5 for the generation of procedural buildings. Therefore, game designers or artists do not have to leave UE5 to make use of CityEngine’s procedural modeling power. The buildings stay procedural all time and artists can change the height, style and appearance of buildings easily with a parametric interface. In addition, buildings can also be generated at runtime.
 
@@ -13,6 +24,14 @@ The latest release is available in the [downloads section on GitHub](https://git
 -   [Installation](doc/installation.md)
 -   [User Guide](doc/usage.md)
 -   [Development Setup](doc/setup.md)
+
+### Cognitive Cities Documentation
+
+-   [🏗️ Architecture Overview](docs/cognitive-cities/architecture/overview.md)
+-   [🌐 Distributed Systems Patterns](docs/cognitive-cities/patterns/distributed-systems.md)
+-   [🧠 Neural Transport Protocols](docs/cognitive-cities/protocols/neural-transport.md)
+-   [🔄 Inter-Organizational Communication](docs/cognitive-cities/protocols/inter-org-comm.md)
+-   [📝 Copilot Note2Self Documentation](docs/cognitive-cities/note2self/README.md)
 
 External documentation:
 
